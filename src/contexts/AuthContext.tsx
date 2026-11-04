@@ -270,6 +270,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null)
     setLoading(false)
 
+    // Redirect to website home page on logout
+    if (typeof window !== 'undefined') {
+      window.location.href = '/'
+    }
+
     if (error) {
       setError(error.message)
       return { error: error.message }

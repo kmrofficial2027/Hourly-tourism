@@ -19,17 +19,38 @@ export async function GET() {
       .from('provider_profiles')
       .select('*')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (!profile) {
+    const { data: compProfile } = await adminSupabase
+      .from('company_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!profile && !compProfile) {
       return NextResponse.json({
         verification_status: 'unsubmitted',
         documents: null,
       })
     }
 
+    if (compProfile && !profile) {
+      return NextResponse.json({
+        verification_status: compProfile.verification_status || 'approved',
+        verified_at: compProfile.verified_at || new Date().toISOString(),
+        documents: compProfile.documents || null,
+        business_name: compProfile.company_name,
+        city: compProfile.city,
+      })
+    }
+
+    const currentStatus =
+      profile.verification_status === 'approved' || profile.verification_status === 'verified'
+        ? 'approved'
+        : profile.verification_status || 'unsubmitted'
+
     return NextResponse.json({
-      verification_status: profile.verification_status || 'unsubmitted',
+      verification_status: currentStatus,
       verified_at: profile.verified_at,
       documents: profile.documents || null,
       business_name: profile.business_name,

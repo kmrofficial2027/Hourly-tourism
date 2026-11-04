@@ -7,6 +7,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  X,
   Play,
   Check,
   AlertCircle,
@@ -38,6 +39,21 @@ export default function ProviderBookingsPage() {
   } | null>(null)
   const [loadingQr, setLoadingQr] = useState(false)
 
+  // Cancellation Modal state
+  const [cancelModalBooking, setCancelModalBooking] = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState<string>('Vehicle breakdown / Maintenance required')
+  const [customReason, setCustomReason] = useState<string>('')
+  const [cancelLoading, setCancelLoading] = useState(false)
+
+  const PROVIDER_CANCEL_REASONS = [
+    'Vehicle breakdown / Maintenance required',
+    'Driver unavailable / Personal emergency',
+    'Severe weather or road route blocked',
+    'Schedule overlap / Unavoidable delay',
+    'Customer requested cancellation directly',
+    'Other reason',
+  ]
+
   const loadBookings = async () => {
     setLoading(true)
     try {
@@ -60,12 +76,14 @@ export default function ProviderBookingsPage() {
   const handleUpdateStatus = async (
     bookingId: string,
     newStatus: string,
-    paymentStatus?: string
+    paymentStatus?: string,
+    reason?: string
   ) => {
     setActionLoading(bookingId)
     try {
       const payload: any = { status: newStatus }
       if (paymentStatus) payload.payment_status = paymentStatus
+      if (reason) payload.reason = reason
 
       const res = await fetch(`/api/bookings/${bookingId}/status`, {
         method: 'PATCH',
@@ -78,6 +96,8 @@ export default function ProviderBookingsPage() {
       showToast.success(
         paymentStatus === 'paid'
           ? 'Payment collected & trip marked as completed!'
+          : newStatus === 'cancelled'
+          ? 'Booking cancelled.'
           : `Booking updated to ${newStatus.replace(/_/g, ' ')}`
       )
       loadBookings()
@@ -86,6 +106,24 @@ export default function ProviderBookingsPage() {
       showToast.error(err.message || 'Error updating status')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!cancelModalBooking) return
+    setCancelLoading(true)
+    try {
+      const finalReason =
+        cancelReason === 'Other reason' && customReason.trim()
+          ? `Provider: ${customReason.trim()}`
+          : `Provider: ${cancelReason}`
+
+      await handleUpdateStatus(cancelModalBooking.id, 'cancelled', undefined, finalReason)
+      setCancelModalBooking(null)
+      setCancelReason('Vehicle breakdown / Maintenance required')
+      setCustomReason('')
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -214,16 +252,26 @@ export default function ProviderBookingsPage() {
                       )}
 
                       {['confirmed', 'paid'].includes(b.status) && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          isLoading={isActioning}
-                          onClick={() => handleUpdateStatus(b.id, 'in_progress')}
-                          className="bg-indigo-600 hover:bg-indigo-700"
-                        >
-                          <Play className="w-3.5 h-3.5 mr-1" />
-                          Start Trip
-                        </Button>
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            isLoading={isActioning}
+                            onClick={() => handleUpdateStatus(b.id, 'in_progress')}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                          >
+                            <Play className="w-3.5 h-3.5 mr-1" />
+                            Start Trip
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => setCancelModalBooking(b)}
+                          >
+                            <X className="w-3.5 h-3.5 mr-1" />
+                            Cancel Ride
+                          </Button>
+                        </>
                       )}
 
                       {/* Collect Payment via QR Button */}
@@ -353,6 +401,73 @@ export default function ProviderBookingsPage() {
                   </Link>
                 </div>
               )}
+            </div>
+          </Modal>
+        )}
+
+        {/* Provider Cancellation Reason Modal */}
+        {cancelModalBooking && (
+          <Modal
+            isOpen={true}
+            onClose={() => setCancelModalBooking(null)}
+            title="Cancel Booking Reservation"
+          >
+            <div className="space-y-5 pt-2">
+              <div className="p-4 bg-red-50 rounded-2xl border border-red-100 text-xs text-red-900 space-y-1">
+                <span className="font-bold block">Cancelling Booking #{cancelModalBooking.booking_number}</span>
+                <p>Please select the reason for cancelling this reservation. The tourist will be notified immediately.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-700 block">Select Cancellation Reason:</label>
+                <div className="space-y-1.5">
+                  {PROVIDER_CANCEL_REASONS.map((r) => (
+                    <label
+                      key={r}
+                      className={`flex items-center space-x-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                        cancelReason === r ? 'border-red-500 bg-red-50/50 font-bold text-red-900' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="provider_cancel_reason"
+                        value={r}
+                        checked={cancelReason === r}
+                        onChange={() => setCancelReason(r)}
+                        className="text-red-600 focus:ring-red-500"
+                      />
+                      <span>{r}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {cancelReason === 'Other reason' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-700 block">Provide Details:</label>
+                  <textarea
+                    rows={2}
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Describe specific reason..."
+                    className="w-full p-2.5 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t">
+                <Button variant="secondary" size="sm" onClick={() => setCancelModalBooking(null)}>
+                  Keep Booking
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  isLoading={cancelLoading}
+                  onClick={handleConfirmCancel}
+                >
+                  Confirm Cancellation
+                </Button>
+              </div>
             </div>
           </Modal>
         )}

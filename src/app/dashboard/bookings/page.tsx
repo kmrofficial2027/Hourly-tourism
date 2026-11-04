@@ -40,11 +40,22 @@ function CustomerBookingsContent() {
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null)
   const [reviewBooking, setReviewBooking] = useState<any | null>(null)
   const [cancelBooking, setCancelBooking] = useState<any | null>(null)
+  const [touristCancelReason, setTouristCancelReason] = useState<string>('Change of travel plans / Destination change')
+  const [touristCustomReason, setTouristCustomReason] = useState<string>('')
   const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
   const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay' | 'provider_qr'>('cashfree')
   const [providerQrInfo, setProviderQrInfo] = useState<any | null>(null)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
+
+  const TOURIST_CANCEL_REASONS = [
+    'Change of travel plans / Destination change',
+    'Found alternative transportation',
+    'Personal emergency or illness',
+    'Booked incorrect date or time',
+    'Price / Budget considerations',
+    'Other reason',
+  ]
 
   const fetchBookings = async () => {
     setLoading(true)
@@ -104,17 +115,22 @@ function CustomerBookingsContent() {
     }
   }, [searchParams])
 
-  // Handle Cancellation
+  // Handle Cancellation with selected reason
   const handleCancelBooking = async () => {
     if (!cancelBooking) return
     setCancelLoading(true)
     try {
+      const finalReason =
+        touristCancelReason === 'Other reason' && touristCustomReason.trim()
+          ? `Tourist: ${touristCustomReason.trim()}`
+          : `Tourist: ${touristCancelReason}`
+
       const res = await fetch(`/api/bookings/${cancelBooking.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: 'cancelled_by_customer',
-          reason: 'Customer initiated cancellation',
+          status: 'cancelled',
+          reason: finalReason,
         }),
       })
 
@@ -125,6 +141,8 @@ function CustomerBookingsContent() {
       showToast.success('Booking cancelled successfully')
       setCancelBooking(null)
       setSelectedBooking(null)
+      setTouristCancelReason('Change of travel plans / Destination change')
+      setTouristCustomReason('')
       fetchBookings()
     } catch (err: any) {
       showToast.error(err.message || 'Error cancelling booking')
@@ -563,18 +581,77 @@ support@hourlytourism.com
         </Modal>
       )}
 
-      {/* Cancel Confirmation Dialog */}
+      {/* Tourist Cancellation Reason Modal */}
       {cancelBooking && (
-        <ConfirmDialog
+        <Modal
           isOpen={Boolean(cancelBooking)}
-          title="Cancel This Booking?"
-          message={`Are you sure you want to cancel booking #${cancelBooking.booking_number}? Cancellation policies apply.`}
-          confirmText="Yes, Cancel Booking"
-          type="danger"
-          isLoading={cancelLoading}
-          onConfirm={handleCancelBooking}
-          onCancel={() => setCancelBooking(null)}
-        />
+          onClose={() => setCancelBooking(null)}
+          title="Cancel Reservation"
+        >
+          <div className="space-y-5 pt-2">
+            <div className="p-4 bg-red-50 rounded-2xl border border-red-100 text-xs text-red-900 space-y-1">
+              <span className="font-bold block">Cancelling Booking #{cancelBooking.booking_number}</span>
+              <p>Please select the reason for cancelling your hourly booking. Any refund will follow the provider's cancellation policy.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-700 block">Select Cancellation Reason:</label>
+              <div className="space-y-1.5">
+                {TOURIST_CANCEL_REASONS.map((r) => (
+                  <label
+                    key={r}
+                    className={`flex items-center space-x-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                      touristCancelReason === r
+                        ? 'border-red-500 bg-red-50/50 font-bold text-red-900'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="tourist_cancel_reason"
+                      value={r}
+                      checked={touristCancelReason === r}
+                      onChange={() => setTouristCancelReason(r)}
+                      className="text-red-600 focus:ring-red-500"
+                    />
+                    <span>{r}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {touristCancelReason === 'Other reason' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 block">Please Specify:</label>
+                <textarea
+                  rows={2}
+                  value={touristCustomReason}
+                  onChange={(e) => setTouristCustomReason(e.target.value)}
+                  placeholder="Tell us more about why you are cancelling..."
+                  className="w-full p-2.5 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCancelBooking(null)}
+              >
+                Keep Booking
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                isLoading={cancelLoading}
+                onClick={handleCancelBooking}
+              >
+                Confirm Cancellation
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Dual Payment Gateway Selection Modal */}

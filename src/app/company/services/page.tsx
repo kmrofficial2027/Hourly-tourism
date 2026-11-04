@@ -42,7 +42,7 @@ export default function CompanyServicesPage() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={loadFleet} disabled={loading}>
+            <Button variant="secondary" size="sm" onClick={loadFleet} disabled={loading}>
               <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
