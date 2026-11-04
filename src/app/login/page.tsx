@@ -143,8 +143,16 @@ function LoginForm() {
         setError('Google authentication did not return an authorization code. Please try again.')
       } else if (errorParam === 'session_not_created') {
         setError('Failed to establish user session after Google login. Please check Supabase Auth settings.')
-      } else if (errorParam.includes('PKCE')) {
-        setError('Previous sign-in session was refreshed. Please enter your email and password below or click Continue with Google.')
+      } else if (
+        errorParam.includes('PKCE') ||
+        errorParam.includes('code challenge') ||
+        errorParam.includes('verifier') ||
+        errorParam.includes('flow_state')
+      ) {
+        setError('Previous sign-in session expired or was interrupted. Please click "Continue with Google" again or sign in with your email below.')
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname)
+        }
       } else {
         setError(`Google Sign-In: ${decodeURIComponent(errorParam)}`)
       }

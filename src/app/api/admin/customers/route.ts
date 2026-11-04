@@ -93,3 +93,35 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const customerId = searchParams.get('id')
+
+    if (!customerId) {
+      return NextResponse.json({ error: 'Missing customer ID' }, { status: 400 })
+    }
+
+    const adminSupabase = await createAdminSupabaseClient()
+
+    // 1. Delete user bookings, reviews, notifications
+    await adminSupabase.from('reviews').delete().eq('customer_id', customerId)
+    await adminSupabase.from('notifications').delete().eq('user_id', customerId)
+    await adminSupabase.from('bookings').delete().eq('customer_id', customerId)
+
+    // 2. Delete profile
+    await adminSupabase.from('profiles').delete().eq('id', customerId)
+
+    // 3. Delete from Supabase Auth
+    const { error: authErr } = await adminSupabase.auth.admin.deleteUser(customerId)
+    if (authErr && !authErr.message.includes('not found')) {
+      console.warn('Auth delete note:', authErr.message)
+    }
+
+    return NextResponse.json({ success: true, message: 'Customer deleted successfully' })
+  } catch (err: any) {
+    console.error('Delete customer error:', err)
+    return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 })
+  }
+}

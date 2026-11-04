@@ -146,3 +146,68 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 })
   }
 }
+
+// DELETE: Safely delete provider with all associated listings, vehicles, and auth records
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const providerId = searchParams.get('id')
+
+    if (!providerId) {
+      return NextResponse.json({ error: 'Missing provider ID' }, { status: 400 })
+    }
+
+    const adminSupabase = await createAdminSupabaseClient()
+
+    // 1. Fetch provider profile to identify user_id
+    let userId = providerId
+    const { data: prov } = await adminSupabase
+      .from('provider_profiles')
+      .select('id, user_id')
+      .or(`id.eq.${providerId},user_id.eq.${providerId}`)
+      .maybeSingle()
+
+    if (prov) {
+      userId = prov.user_id
+
+      // 2. Fetch all service listings for this provider
+      const { data: listings } = await adminSupabase
+        .from('service_listings')
+        .select('id')
+        .eq('provider_id', prov.id)
+
+      if (listings && listings.length > 0) {
+        const listingIds = listings.map((l: any) => l.id)
+
+        // Delete child tables of listings
+        for (const lId of listingIds) {
+          await adminSupabase.from('vehicle_details').delete().eq('listing_id', lId)
+          await adminSupabase.from('guide_details').delete().eq('listing_id', lId)
+          await adminSupabase.from('hourly_packages').delete().eq('listing_id', lId)
+          await adminSupabase.from('bookings').delete().eq('listing_id', lId)
+        }
+
+        // Delete listings themselves
+        await adminSupabase.from('service_listings').delete().eq('provider_id', prov.id)
+      }
+
+      // 3. Delete provider profile
+      await adminSupabase.from('provider_profiles').delete().eq('id', prov.id)
+    }
+
+    // 4. Delete notifications & profile
+    await adminSupabase.from('notifications').delete().eq('user_id', userId)
+    await adminSupabase.from('profiles').delete().eq('id', userId)
+
+    // 5. Delete from Supabase Auth
+    const { error: authErr } = await adminSupabase.auth.admin.deleteUser(userId)
+    if (authErr && !authErr.message.includes('not found')) {
+      console.warn('Auth delete note:', authErr.message)
+    }
+
+    return NextResponse.json({ success: true, message: 'Provider and fleet listings removed cleanly.' })
+  } catch (err: any) {
+    console.error('Delete provider error:', err)
+    return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 })
+  }
+}

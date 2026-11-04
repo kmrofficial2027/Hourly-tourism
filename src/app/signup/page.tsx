@@ -85,8 +85,16 @@ function SignUpForm() {
         setError('Google sign-up was cancelled or could not be completed.')
       } else if (errorParam === 'missing_code') {
         setError('Google sign-up did not return an authorization code. Please try again.')
-      } else if (errorParam.includes('PKCE')) {
-        setError('Previous sign-up session was refreshed. Please register below with Email & Password or try Google Sign-Up again.')
+      } else if (
+        errorParam.includes('PKCE') ||
+        errorParam.includes('code challenge') ||
+        errorParam.includes('verifier') ||
+        errorParam.includes('flow_state')
+      ) {
+        setError('Previous sign-up session expired or was interrupted. Please click "Continue with Google" again or sign up with your email below.')
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname)
+        }
       } else {
         setError(`Google Sign-Up: ${decodeURIComponent(errorParam)}`)
       }

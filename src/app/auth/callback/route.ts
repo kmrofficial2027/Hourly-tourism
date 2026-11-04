@@ -89,9 +89,16 @@ export async function GET(request: Request) {
 
     if (exchangeError) {
       console.error('OAuth exchangeCodeForSession error:', exchangeError)
-      return NextResponse.redirect(
+      const errResponse = NextResponse.redirect(
         `${siteOrigin}/login?error=${encodeURIComponent(exchangeError.message || 'exchange_failed')}`
       )
+      // Clear out any contaminated or mismatched code-verifier cookies
+      cookieStore.getAll().forEach((cookie) => {
+        if (cookie.name.includes('code-verifier') || cookie.name.includes('auth-token')) {
+          errResponse.cookies.set(cookie.name, '', { maxAge: 0, path: '/' })
+        }
+      })
+      return errResponse
     }
 
     if (data?.user) {
