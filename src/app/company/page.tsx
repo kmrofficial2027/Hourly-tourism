@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Building2,
@@ -11,6 +11,7 @@ import {
   Users,
   Compass,
   TrendingUp,
+  RefreshCw,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
@@ -18,12 +19,64 @@ import { formatCurrency } from '@/lib/utils'
 
 export default function CompanyDashboardPage() {
   const [stats, setStats] = useState({
-    fleetSize: 12,
-    activeBookings: 8,
-    monthlyGross: 142000,
-    monthlyNet: 127800,
-    totalDrivers: 6,
+    fleetSize: 0,
+    activeBookings: 0,
+    monthlyGross: 0,
+    monthlyNet: 0,
+    totalDrivers: 0,
   })
+  const [fleet, setFleet] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [servicesRes, bookingsRes] = await Promise.all([
+        fetch('/api/services'),
+        fetch('/api/bookings?role=company'),
+      ])
+
+      let fleetItems: any[] = []
+      let bookingItems: any[] = []
+
+      if (servicesRes.ok) {
+        const sData = await servicesRes.json()
+        fleetItems = sData.listings || []
+        setFleet(fleetItems)
+      }
+
+      if (bookingsRes.ok) {
+        const bData = await bookingsRes.json()
+        bookingItems = bData.bookings || []
+      }
+
+      const activeB = bookingItems.filter((b) =>
+        ['confirmed', 'in_progress'].includes(b.status)
+      ).length
+
+      const totalGross = bookingItems
+        .filter((b) => ['paid', 'completed'].includes(b.payment_status))
+        .reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+
+      const netEarnings = Math.round(totalGross * 0.9)
+
+      setStats({
+        fleetSize: fleetItems.length,
+        activeBookings: activeB,
+        monthlyGross: totalGross,
+        monthlyNet: netEarnings,
+        totalDrivers: 0,
+      })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
 
   return (
     <DashboardLayout role="company" title="Company Operator Portal">
@@ -70,12 +123,12 @@ export default function CompanyDashboardPage() {
               Active Bookings Today
             </span>
             <h3 className="text-2xl font-black text-emerald-700">{stats.activeBookings}</h3>
-            <p className="text-[11px] text-emerald-600 font-semibold">Across 4 destinations</p>
+            <p className="text-[11px] text-emerald-600 font-semibold">In-progress trips</p>
           </div>
 
           <div className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
-              Monthly Gross Revenue
+              Gross Revenue
             </span>
             <h3 className="text-2xl font-black text-gray-900">
               {formatCurrency(stats.monthlyGross)}
@@ -105,33 +158,42 @@ export default function CompanyDashboardPage() {
             </Link>
           </div>
 
-          <div className="divide-y divide-gray-100 text-xs">
-            {[
-              { type: 'Van', name: 'Force Traveller 9-Seater Luxury', reg: 'GA-03-Z-8910', city: 'Goa', rate: 899, status: 'On Trip (4 hrs)' },
-              { type: 'Car', name: 'Hyundai Creta SX Chauffeur', reg: 'MH-02-EE-4129', city: 'Mumbai', rate: 599, status: 'Available' },
-              { type: 'Bike', name: 'Royal Enfield Classic 350 (x4 fleet)', reg: 'RJ-14-BQ-1022', city: 'Jaipur', rate: 199, status: 'Available' },
-            ].map((v, i) => (
-              <div key={i} className="py-3.5 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-sm text-gray-900">{v.name}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gray-100 text-gray-700">
-                      {v.type}
-                    </span>
+          {loading ? (
+            <div className="text-center py-8 text-xs text-gray-400">Loading fleet data...</div>
+          ) : fleet.length === 0 ? (
+            <div className="text-center py-8 space-y-2">
+              <Compass className="w-8 h-8 text-gray-300 mx-auto" />
+              <p className="text-sm font-semibold text-gray-500">No vehicles registered yet</p>
+              <p className="text-xs text-gray-400">
+                Add your fleet of bikes, cars, and vans to manage commercial reservations.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 text-xs">
+              {fleet.slice(0, 5).map((v) => (
+                <div key={v.id} className="py-3.5 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">{v.title}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gray-100 text-gray-700">
+                        {v.category}
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-[11px] mt-0.5">
+                      City: {v.destination_city} • Rate: {formatCurrency(Number(v.hourly_rate))}/hr
+                    </p>
                   </div>
-                  <p className="text-gray-400 text-[11px] mt-0.5">
-                    Reg: {v.reg} • City: {v.city} • Rate: {formatCurrency(v.rate)}/hr
-                  </p>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    v.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {v.is_active ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                  {v.status}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
   )
 }
-

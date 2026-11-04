@@ -15,7 +15,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { status, reason, notes } = await request.json()
+    const { status, reason, notes, payment_status } = await request.json()
     const bookingId = params.id
 
     // Fetch existing booking
@@ -37,6 +37,7 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     }
 
+    if (payment_status) updateData.payment_status = payment_status
     if (status === 'confirmed') updateData.confirmed_at = new Date().toISOString()
     if (status === 'completed') updateData.completed_at = new Date().toISOString()
     if (status.includes('cancel')) {

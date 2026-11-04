@@ -16,6 +16,8 @@ import {
   Download,
   MessageCircle,
   ShieldCheck,
+  QrCode,
+  Copy,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
@@ -39,7 +41,8 @@ function CustomerBookingsContent() {
   const [reviewBooking, setReviewBooking] = useState<any | null>(null)
   const [cancelBooking, setCancelBooking] = useState<any | null>(null)
   const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
-  const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay'>('cashfree')
+  const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay' | 'provider_qr'>('cashfree')
+  const [providerQrInfo, setProviderQrInfo] = useState<any | null>(null)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
 
@@ -130,17 +133,52 @@ function CustomerBookingsContent() {
     }
   }
 
-  // Open Dual Gateway Payment Modal
-  const handlePayNow = (booking: any) => {
+  // Open Payment Modal (Cashfree, Razorpay, or Provider QR)
+  const handlePayNow = async (booking: any) => {
     setPaymentModalBooking(booking)
+    setProviderQrInfo(null)
+    try {
+      const pid = booking.provider_id || booking.service_listings?.provider_id
+      if (pid) {
+        const res = await fetch(`/api/provider/qr-code?providerId=${pid}`)
+        if (res.ok) {
+          const data = await res.json()
+          setProviderQrInfo(data)
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching provider QR:', e)
+    }
   }
 
-  // Execute Payment via Selected Gateway (Cashfree or Razorpay)
+  // Execute Payment via Selected Method (Cashfree, Razorpay, or Provider QR)
   const handleExecutePayment = async () => {
     if (!paymentModalBooking) return
     setPayLoading(true)
 
     try {
+      if (gatewayChoice === 'provider_qr') {
+        const res = await fetch(`/api/bookings/${paymentModalBooking.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: ['pending', 'unpaid'].includes(paymentModalBooking.status)
+              ? 'confirmed'
+              : paymentModalBooking.status,
+            payment_status: 'paid',
+            notes: 'Paid via direct Provider UPI QR code on-site',
+          }),
+        })
+
+        if (!res.ok) throw new Error('Failed to record on-site payment')
+
+        showToast.success('Payment recorded via Provider QR Code! Reservation confirmed.')
+        setPaymentModalBooking(null)
+        setSelectedBooking(null)
+        fetchBookings()
+        return
+      }
+
       if (gatewayChoice === 'cashfree') {
         // --- CASHFREE FLOW ---
         const res = await fetch('/api/payments/cashfree/create-order', {
@@ -648,7 +686,91 @@ support@hourlytourism.com
                   </div>
                 </div>
               </div>
+
+              {/* Option 3: Provider Direct UPI QR Code (Pay at Service End) */}
+              <div
+                onClick={() => setGatewayChoice('provider_qr')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  gatewayChoice === 'provider_qr'
+                    ? 'border-purple-600 bg-purple-50/40 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      gatewayChoice === 'provider_qr'
+                        ? 'border-purple-600 bg-purple-600'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {gatewayChoice === 'provider_qr' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">
+                        Direct Provider UPI QR Code
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-800">
+                        On-Site Settle
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Scan host’s personal QR code (GPay, PhonePe, Paytm) at service pickup or trip completion
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Provider QR display when Option 3 is selected */}
+            {gatewayChoice === 'provider_qr' && (
+              <div className="p-4 bg-purple-50/70 rounded-2xl border border-purple-200 text-center space-y-3">
+                {providerQrInfo?.qrCodeUrl ? (
+                  <>
+                    <div className="w-48 h-48 bg-white p-2.5 rounded-2xl border-2 border-purple-300 shadow-sm mx-auto flex items-center justify-center overflow-hidden">
+                      <img
+                        src={providerQrInfo.qrCodeUrl}
+                        alt="Provider UPI QR Code"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-700">
+                      Scan with any UPI app to pay{' '}
+                      <strong>{formatCurrency(Number(paymentModalBooking.total_amount))}</strong>{' '}
+                      directly to host {providerQrInfo.businessName ? `(${providerQrInfo.businessName})` : ''}.
+                    </p>
+                    {providerQrInfo.upiId && (
+                      <div className="flex items-center justify-center space-x-2 bg-white py-1.5 px-3 rounded-lg border border-purple-200 text-xs w-fit mx-auto">
+                        <span className="text-gray-500">UPI ID:</span>
+                        <span className="font-mono font-bold text-purple-950">{providerQrInfo.upiId}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(providerQrInfo.upiId)
+                            showToast.success('UPI ID copied!')
+                          }}
+                          className="text-purple-700 hover:text-purple-900"
+                          title="Copy UPI ID"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-2 text-xs text-gray-600">
+                    <QrCode className="w-8 h-8 text-purple-400 mx-auto mb-1" />
+                    <p className="font-bold text-gray-800">Host accepts direct QR / Cash on-site</p>
+                    <p className="text-gray-500 mt-0.5">
+                      Your host will present their verified UPI QR code at service completion.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Escrow & Security Note */}
             <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 flex items-center space-x-2">
@@ -674,12 +796,23 @@ support@hourlytourism.com
                 className={
                   gatewayChoice === 'cashfree'
                     ? 'bg-[#0a4d29] hover:bg-[#07361d]'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    : gatewayChoice === 'razorpay'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-purple-700 hover:bg-purple-800'
                 }
               >
-                <CreditCard className="w-4 h-4 mr-1.5" />
-                Pay {formatCurrency(Number(paymentModalBooking.total_amount))} via{' '}
-                {gatewayChoice === 'cashfree' ? 'Cashfree' : 'Razorpay'}
+                {gatewayChoice === 'provider_qr' ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                    Confirm Paid via Provider QR
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 mr-1.5" />
+                    Pay {formatCurrency(Number(paymentModalBooking.total_amount))} via{' '}
+                    {gatewayChoice === 'cashfree' ? 'Cashfree' : 'Razorpay'}
+                  </>
+                )}
               </Button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Calendar,
   Clock,
@@ -11,10 +12,15 @@ import {
   AlertCircle,
   MapPin,
   Phone,
+  QrCode,
+  Copy,
+  ExternalLink,
+  CreditCard,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { showToast } from '@/components/ui/Toast'
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils'
 
@@ -22,6 +28,15 @@ export default function ProviderBookingsPage() {
   const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // QR Payment Collection Modal state
+  const [qrModalBooking, setQrModalBooking] = useState<any | null>(null)
+  const [providerQr, setProviderQr] = useState<{
+    qrCodeUrl: string | null
+    upiId: string | null
+    businessName: string | null
+  } | null>(null)
+  const [loadingQr, setLoadingQr] = useState(false)
 
   const loadBookings = async () => {
     setLoading(true)
@@ -42,24 +57,58 @@ export default function ProviderBookingsPage() {
     loadBookings()
   }, [])
 
-  const handleUpdateStatus = async (bookingId: string, newStatus: string) => {
+  const handleUpdateStatus = async (
+    bookingId: string,
+    newStatus: string,
+    paymentStatus?: string
+  ) => {
     setActionLoading(bookingId)
     try {
+      const payload: any = { status: newStatus }
+      if (paymentStatus) payload.payment_status = paymentStatus
+
       const res = await fetch(`/api/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) throw new Error('Status update failed')
 
-      showToast.success(`Booking updated to ${newStatus.replace(/_/g, ' ')}`)
+      showToast.success(
+        paymentStatus === 'paid'
+          ? 'Payment collected & trip marked as completed!'
+          : `Booking updated to ${newStatus.replace(/_/g, ' ')}`
+      )
       loadBookings()
+      setQrModalBooking(null)
     } catch (err: any) {
       showToast.error(err.message || 'Error updating status')
     } finally {
       setActionLoading(null)
     }
+  }
+
+  // Open QR modal and fetch provider's uploaded QR
+  const handleOpenQrModal = async (booking: any) => {
+    setQrModalBooking(booking)
+    setLoadingQr(true)
+    try {
+      const res = await fetch('/api/provider/qr-code')
+      if (res.ok) {
+        const data = await res.json()
+        setProviderQr(data)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingQr(false)
+    }
+  }
+
+  const handleCopyUpi = (upi: string) => {
+    navigator.clipboard.writeText(upi)
+    showToast.success('UPI ID copied to clipboard!')
   }
 
   return (
@@ -70,7 +119,7 @@ export default function ProviderBookingsPage() {
             Customer Hourly Bookings
           </h1>
           <p className="text-xs text-gray-500">
-            Accept requests, track live trips, and mark services as completed.
+            Accept requests, track live trips, and collect on-site payments via your direct UPI QR code.
           </p>
         </div>
 
@@ -100,6 +149,15 @@ export default function ProviderBookingsPage() {
                         #{b.booking_number}
                       </span>
                       <BookingStatusBadge status={b.status} />
+                      {b.payment_status === 'paid' ? (
+                        <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          Paid
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                          Payment Pending
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-base font-bold text-gray-900">
@@ -131,7 +189,7 @@ export default function ProviderBookingsPage() {
                       <span className="text-[10px] text-gray-400">Total Booking Value</span>
                     </div>
 
-                    {/* Status update actions */}
+                    {/* Status and QR Collection Actions */}
                     <div className="flex flex-wrap items-center gap-2">
                       {b.status === 'pending' && (
                         <>
@@ -168,6 +226,19 @@ export default function ProviderBookingsPage() {
                         </Button>
                       )}
 
+                      {/* Collect Payment via QR Button */}
+                      {['confirmed', 'in_progress'].includes(b.status) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleOpenQrModal(b)}
+                          className="border-emerald-600 text-emerald-800 hover:bg-emerald-50"
+                        >
+                          <QrCode className="w-3.5 h-3.5 mr-1 text-emerald-700" />
+                          Collect via QR
+                        </Button>
+                      )}
+
                       {b.status === 'in_progress' && (
                         <Button
                           variant="primary"
@@ -176,7 +247,7 @@ export default function ProviderBookingsPage() {
                           onClick={() => handleUpdateStatus(b.id, 'completed')}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          Mark Completed
+                          End Trip
                         </Button>
                       )}
                     </div>
@@ -186,8 +257,106 @@ export default function ProviderBookingsPage() {
             })}
           </div>
         )}
+
+        {/* QR Payment Collection Modal */}
+        {qrModalBooking && (
+          <Modal
+            isOpen={true}
+            onClose={() => setQrModalBooking(null)}
+            title="Direct Payment UPI QR Code"
+          >
+            <div className="space-y-6 pt-2">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                    Amount to Collect
+                  </span>
+                  <span className="text-2xl font-black text-emerald-900">
+                    {formatCurrency(Number(qrModalBooking.total_amount))}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-gray-500 block">Booking Number</span>
+                  <span className="font-mono text-xs font-bold text-gray-800">
+                    #{qrModalBooking.booking_number}
+                  </span>
+                </div>
+              </div>
+
+              {loadingQr ? (
+                <div className="py-12 text-center text-xs text-gray-400">Loading your QR code...</div>
+              ) : providerQr?.qrCodeUrl ? (
+                <div className="space-y-4 text-center">
+                  <div className="w-64 h-64 mx-auto bg-white p-3 rounded-3xl border-2 border-emerald-500 shadow-md flex items-center justify-center overflow-hidden">
+                    <img
+                      src={providerQr.qrCodeUrl}
+                      alt="Provider Payment QR Code"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-600 max-w-sm mx-auto">
+                    Ask tourist to scan with <strong>Google Pay, PhonePe, Paytm</strong> or any UPI app.
+                  </p>
+
+                  {providerQr.upiId && (
+                    <div className="flex items-center justify-center space-x-2 bg-gray-50 py-2 px-4 rounded-xl border border-gray-200 w-fit mx-auto text-xs">
+                      <span className="text-gray-500">UPI ID:</span>
+                      <span className="font-mono font-bold text-gray-800">{providerQr.upiId}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUpi(providerQr.upiId!)}
+                        className="text-emerald-700 hover:text-emerald-800 p-1"
+                        title="Copy UPI ID"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-gray-100 space-y-2">
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      size="lg"
+                      isLoading={actionLoading === qrModalBooking.id}
+                      onClick={() =>
+                        handleUpdateStatus(qrModalBooking.id, 'completed', 'paid')
+                      }
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      Confirm Payment Received & Complete Trip
+                    </Button>
+                    <p className="text-[11px] text-gray-400 text-center">
+                      Marks booking as paid in escrow logs and finalizes the reservation.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900">
+                      No Payment QR Code Uploaded Yet
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                      Upload your Google Pay, PhonePe, or Paytm QR code in your provider profile so tourists can pay you directly at service completion.
+                    </p>
+                  </div>
+                  <Link href="/provider/profile">
+                    <Button variant="primary" size="md">
+                      <QrCode className="w-4 h-4 mr-1.5" />
+                      Upload QR Code in Profile
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </Modal>
+        )}
       </div>
     </DashboardLayout>
   )
 }
-

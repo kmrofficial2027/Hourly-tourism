@@ -21,13 +21,13 @@ import { formatCurrency, formatDate, formatTime } from '@/lib/utils'
 
 export default function ProviderOverviewPage() {
   const [stats, setStats] = useState({
-    totalListings: 1,
-    bookingRequests: 2,
-    upcomingBookings: 3,
-    completedBookings: 14,
-    grossRevenue: 18450,
-    netEarnings: 16605,
-    averageRating: 4.9,
+    totalListings: 0,
+    bookingRequests: 0,
+    upcomingBookings: 0,
+    completedBookings: 0,
+    grossRevenue: 0,
+    netEarnings: 0,
+    averageRating: 0,
   })
 
   const [recentRequests, setRecentRequests] = useState<any[]>([])
@@ -37,13 +37,42 @@ export default function ProviderOverviewPage() {
     async function loadData() {
       setLoading(true)
       try {
-        const res = await fetch('/api/bookings?role=provider')
-        if (res.ok) {
-          const data = await res.json()
-          if (data.bookings && data.bookings.length > 0) {
-            setRecentRequests(data.bookings.slice(0, 5))
-          }
+        const [bookingsRes, servicesRes] = await Promise.all([
+          fetch('/api/bookings?role=provider'),
+          fetch('/api/services'),
+        ])
+
+        let bookings: any[] = []
+        let listingsCount = 0
+
+        if (bookingsRes.ok) {
+          const bData = await bookingsRes.json()
+          bookings = bData.bookings || []
+          setRecentRequests(bookings.slice(0, 5))
         }
+
+        if (servicesRes.ok) {
+          const sData = await servicesRes.json()
+          listingsCount = (sData.listings || []).length
+        }
+
+        const bookingRequests = bookings.filter((b) => b.status === 'pending').length
+        const upcomingBookings = bookings.filter((b) => ['confirmed', 'in_progress'].includes(b.status)).length
+        const completedBookings = bookings.filter((b) => b.status === 'completed').length
+        const grossRevenue = bookings
+          .filter((b) => ['paid', 'completed'].includes(b.payment_status))
+          .reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+        const netEarnings = Math.round(grossRevenue * 0.9)
+
+        setStats({
+          totalListings: listingsCount,
+          bookingRequests,
+          upcomingBookings,
+          completedBookings,
+          grossRevenue,
+          netEarnings,
+          averageRating: 5.0,
+        })
       } catch (err) {
         console.error(err)
       } finally {
@@ -194,4 +223,3 @@ export default function ProviderOverviewPage() {
     </DashboardLayout>
   )
 }
-

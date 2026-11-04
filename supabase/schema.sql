@@ -1166,5 +1166,12 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- ============================================================================
+-- 8. PROVIDER QR CODE FOR DIRECT PAYMENT COLLECTION
+-- ============================================================================
+
+-- Provider QR code for direct payment collection
+ALTER TABLE provider_profiles ADD COLUMN IF NOT EXISTS payment_qr_url TEXT;
+
+-- ============================================================================
 -- End of schema
 -- ============================================================================
