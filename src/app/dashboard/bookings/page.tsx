@@ -37,6 +37,8 @@ function CustomerBookingsContent() {
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null)
   const [reviewBooking, setReviewBooking] = useState<any | null>(null)
   const [cancelBooking, setCancelBooking] = useState<any | null>(null)
+  const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
+  const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay'>('cashfree')
   const [cancelLoading, setCancelLoading] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
 
@@ -54,7 +56,7 @@ function CustomerBookingsContent() {
           if (match) {
             setSelectedBooking(match)
             if (defaultAction === 'pay') {
-              // Trigger payment flow
+              setPaymentModalBooking(match)
             }
           }
         }
@@ -69,6 +71,34 @@ function CustomerBookingsContent() {
   useEffect(() => {
     fetchBookings()
   }, [highlightBookingId])
+
+  // Handle return redirect from Cashfree
+  useEffect(() => {
+    const orderIdParam = searchParams.get('order_id')
+    const bookingIdParam = searchParams.get('bookingId')
+
+    if (orderIdParam && bookingIdParam) {
+      const verifyCashfreeReturn = async () => {
+        try {
+          const res = await fetch('/api/payments/cashfree/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookingId: bookingIdParam,
+              order_id: orderIdParam,
+            }),
+          })
+          if (res.ok) {
+            showToast.success('Cashfree payment verified! Reservation confirmed.')
+            fetchBookings()
+          }
+        } catch (err) {
+          console.error(err)
+        }
+      }
+      verifyCashfreeReturn()
+    }
+  }, [searchParams])
 
   // Handle Cancellation
   const handleCancelBooking = async () => {
@@ -99,44 +129,102 @@ function CustomerBookingsContent() {
     }
   }
 
-  // Handle Razorpay Payment flow
-  const handlePayNow = async (booking: any) => {
+  // Open Dual Gateway Payment Modal
+  const handlePayNow = (booking: any) => {
+    setPaymentModalBooking(booking)
+  }
+
+  // Execute Payment via Selected Gateway (Cashfree or Razorpay)
+  const handleExecutePayment = async () => {
+    if (!paymentModalBooking) return
     setPayLoading(true)
+
     try {
-      const res = await fetch('/api/payments/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: booking.id }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
-
-      if (data.isDevelopmentMode) {
-        // Development mode: verify transaction immediately for testing
-        const verifyRes = await fetch('/api/payments/razorpay/verify', {
+      if (gatewayChoice === 'cashfree') {
+        // --- CASHFREE FLOW ---
+        const res = await fetch('/api/payments/cashfree/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bookingId: booking.id,
-            isDevelopmentMode: true,
-            razorpay_order_id: data.order.id,
-            razorpay_payment_id: `pay_test_${Date.now()}`,
-          }),
+          body: JSON.stringify({ bookingId: paymentModalBooking.id }),
         })
 
-        if (!verifyRes.ok) throw new Error('Verification failed')
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to initialize Cashfree payment')
 
-        showToast.success('Payment verified in test mode! Booking confirmed.')
-        setSelectedBooking(null)
-        fetchBookings()
+        if (data.isDevelopmentMode) {
+          const verifyRes = await fetch('/api/payments/cashfree/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookingId: paymentModalBooking.id,
+              order_id: data.order_id,
+              isDevelopmentMode: true,
+            }),
+          })
+
+          if (!verifyRes.ok) throw new Error('Cashfree verification failed')
+
+          showToast.success('Payment verified via Cashfree! Reservation confirmed.')
+          setPaymentModalBooking(null)
+          setSelectedBooking(null)
+          fetchBookings()
+        } else {
+          showToast.loading('Opening Cashfree Gateway...')
+          const script = document.createElement('script')
+          script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js'
+          script.onload = () => {
+            const cashfree = (window as any).Cashfree({ mode: data.environment || 'sandbox' })
+            cashfree.checkout({
+              paymentSessionId: data.payment_session_id,
+              redirectTarget: '_modal',
+            }).then((result: any) => {
+              if (result.error) {
+                showToast.error(result.error.message || 'Payment cancelled')
+              }
+              if (result.paymentDetails) {
+                showToast.success('Cashfree payment successful!')
+                setPaymentModalBooking(null)
+                fetchBookings()
+              }
+            })
+          }
+          document.body.appendChild(script)
+        }
       } else {
-        // Real Razorpay Checkout integration
-        showToast.loading('Opening Razorpay checkout...')
-        // Checkout script invocation
+        // --- RAZORPAY FLOW ---
+        const res = await fetch('/api/payments/razorpay/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingId: paymentModalBooking.id }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to initialize Razorpay payment')
+
+        if (data.isDevelopmentMode) {
+          const verifyRes = await fetch('/api/payments/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookingId: paymentModalBooking.id,
+              razorpay_order_id: data.order.id,
+              razorpay_payment_id: `pay_rzp_test_${Date.now()}`,
+              isDevelopmentMode: true,
+            }),
+          })
+
+          if (!verifyRes.ok) throw new Error('Razorpay verification failed')
+
+          showToast.success('Payment verified via Razorpay! Reservation confirmed.')
+          setPaymentModalBooking(null)
+          setSelectedBooking(null)
+          fetchBookings()
+        } else {
+          showToast.loading('Opening Razorpay Gateway...')
+        }
       }
     } catch (err: any) {
-      showToast.error(err.message || 'Payment failed')
+      showToast.error(err.message || 'Payment processing failed')
     } finally {
       setPayLoading(false)
     }
@@ -448,6 +536,153 @@ support@hourlytourism.com
           onConfirm={handleCancelBooking}
           onCancel={() => setCancelBooking(null)}
         />
+      )}
+
+      {/* Dual Payment Gateway Selection Modal */}
+      {paymentModalBooking && (
+        <Modal
+          isOpen={Boolean(paymentModalBooking)}
+          onClose={() => !payLoading && setPaymentModalBooking(null)}
+          title="Complete Secure Payment"
+          size="md"
+        >
+          <div className="space-y-5">
+            {/* Booking Summary Header */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 font-mono">
+                  Booking #{paymentModalBooking.booking_number}
+                </p>
+                <h4 className="font-bold text-sm text-gray-900 mt-0.5">
+                  {paymentModalBooking.service_listings?.title || 'Hourly Tourism Reservation'}
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Duration: {paymentModalBooking.duration_hours} hours • {paymentModalBooking.booking_date}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-gray-400 block">Total Due</span>
+                <span className="text-xl font-black text-[#0a4d29]">
+                  {formatCurrency(Number(paymentModalBooking.total_amount))}
+                </span>
+              </div>
+            </div>
+
+            {/* Gateway Selection */}
+            <div className="space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+                Choose Payment Gateway
+              </label>
+
+              {/* Option 1: Cashfree Payments */}
+              <div
+                onClick={() => setGatewayChoice('cashfree')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  gatewayChoice === 'cashfree'
+                    ? 'border-emerald-600 bg-emerald-50/40 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      gatewayChoice === 'cashfree'
+                        ? 'border-emerald-600 bg-emerald-600'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {gatewayChoice === 'cashfree' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">
+                        Cashfree Payments
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                        Recommended
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      UPI (Google Pay, PhonePe, Paytm, BHIM), NetBanking, Credit/Debit Cards, PayLater
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option 2: Razorpay */}
+              <div
+                onClick={() => setGatewayChoice('razorpay')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  gatewayChoice === 'razorpay'
+                    ? 'border-blue-600 bg-blue-50/40 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      gatewayChoice === 'razorpay'
+                        ? 'border-blue-600 bg-blue-600'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {gatewayChoice === 'razorpay' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">
+                        Razorpay
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-100 text-blue-800">
+                        Popular
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      UPI QR Code, All Major Bank Cards, NetBanking, Wallets
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Escrow & Security Note */}
+            <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                256-bit SSL encrypted • Funds held in escrow until booking commences • Instant refund protection.
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <Button
+                variant="secondary"
+                disabled={payLoading}
+                onClick={() => setPaymentModalBooking(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                isLoading={payLoading}
+                onClick={handleExecutePayment}
+                className={
+                  gatewayChoice === 'cashfree'
+                    ? 'bg-[#0a4d29] hover:bg-[#07361d]'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }
+              >
+                <CreditCard className="w-4 h-4 mr-1.5" />
+                Pay {formatCurrency(Number(paymentModalBooking.total_amount))} via{' '}
+                {gatewayChoice === 'cashfree' ? 'Cashfree' : 'Razorpay'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </DashboardLayout>
   )

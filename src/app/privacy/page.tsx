@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           <h2 className="text-base font-bold text-gray-900 mt-4">2. Payments Security</h2>
           <p>
             Payment transactions are tokenized and processed via certified PCI-DSS compliant gateways
-            (Razorpay). Hourly Tourism does not store raw credit card numbers or UPI PINs on its servers.
+            (Cashfree Payments &amp; Razorpay). Hourly Tourism does not store raw credit card numbers or UPI PINs on its servers.
           </p>
         </div>
       </main>

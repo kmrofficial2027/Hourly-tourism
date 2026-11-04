@@ -139,6 +139,7 @@ export function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   isActive
                     ? 'bg-gradient-to-r from-[#ff7a00] to-[#f59e0b] text-white shadow-md shadow-orange-500/25'

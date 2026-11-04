@@ -17,6 +17,7 @@ import {
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { Button } from '@/components/ui/Button'
+import { Logo } from '@/components/ui/Logo'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -121,13 +122,16 @@ export default function BecomeProviderPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 font-display">
-                  Step 1: Partner Information
-                </h2>
-                <p className="text-xs text-gray-500">
-                  Select your operator model and provide your basic business credentials.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 font-display">
+                    Step 1: Partner Information
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Select your operator model and provide your basic business credentials.
+                  </p>
+                </div>
+                <Logo variant="compact" />
               </div>
 
               {/* Account Type Toggle */}

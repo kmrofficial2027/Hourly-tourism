@@ -1,0 +1,52 @@
+{
+  "name": "Hourly Tourism",
+  "short_name": "HourlyTrip",
+  "description": "Discover and book bikes, cars, vans & sightseeing tours by the hour in Coimbatore & Western Ghats.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en-IN",
+  "categories": ["travel", "tourism", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "Hourly Tourism Home"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Bikes",
+      "short_name": "Bikes",
+      "description": "Browse hourly bike rentals",
+      "url": "/explore?category=bike",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Browse Cars",
+      "short_name": "Cars",
+      "description": "Browse hourly car rentals",
+      "url": "/explore?category=car",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+

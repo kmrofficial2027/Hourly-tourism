@@ -62,7 +62,7 @@ export default function CancellationPolicyPage() {
           <section className="space-y-2">
             <h2 className="text-lg font-bold text-gray-900">3. Refund Processing Time</h2>
             <p>
-              Approved refunds are initiated through Razorpay within 24 business hours. Bank settlement
+              Approved refunds are initiated through Cashfree Payments or Razorpay within 24 business hours. Bank settlement
               typically reflects in your account within 5-7 working days.
             </p>
           </section>

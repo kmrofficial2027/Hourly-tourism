@@ -34,33 +34,40 @@ export async function updateSession(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Protected routes
+    // Protected routes (except /admin/login)
+    const isLoginPage = request.nextUrl.pathname === '/admin/login' || request.nextUrl.pathname === '/login'
     const protectedPaths = ['/dashboard', '/provider', '/company', '/admin']
-    const isProtectedRoute = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
+    const isProtectedRoute = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path)) && !isLoginPage
 
     if (isProtectedRoute && !user) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/login'
+      redirectUrl.pathname = request.nextUrl.pathname.startsWith('/admin') ? '/admin/login' : '/login'
       redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
     // Role-based route protection
     if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      // Fast path: inspect role in user JWT metadata without a database roundtrip
+      let role = (user.user_metadata?.role as string) || (user.app_metadata?.role as string)
 
-      if (profile) {
-        if (request.nextUrl.pathname.startsWith('/admin') && profile.role !== 'admin') {
+      if (!role) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        role = profile?.role
+      }
+
+      if (role) {
+        if (request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin/login' && role !== 'admin') {
           return NextResponse.redirect(new URL('/dashboard', request.url))
         }
-        if (request.nextUrl.pathname.startsWith('/provider') && !['provider', 'admin'].includes(profile.role)) {
+        if (request.nextUrl.pathname.startsWith('/provider') && !['provider', 'admin'].includes(role)) {
           return NextResponse.redirect(new URL('/dashboard', request.url))
         }
-        if (request.nextUrl.pathname.startsWith('/company') && !['company', 'admin'].includes(profile.role)) {
+        if (request.nextUrl.pathname.startsWith('/company') && !['company', 'admin'].includes(role)) {
           return NextResponse.redirect(new URL('/dashboard', request.url))
         }
       }

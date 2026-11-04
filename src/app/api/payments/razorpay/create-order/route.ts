@@ -14,6 +14,10 @@ export async function POST(request: Request) {
 
     const { bookingId } = await request.json()
 
+    if (!bookingId) {
+      return NextResponse.json({ error: 'Missing bookingId' }, { status: 400 })
+    }
+
     // Fetch booking
     const { data: booking, error: fetchErr } = await supabase
       .from('bookings')
@@ -28,17 +32,23 @@ export async function POST(request: Request) {
     const keyId = process.env.RAZORPAY_KEY_ID
     const keySecret = process.env.RAZORPAY_KEY_SECRET
 
+    const isPlaceholder =
+      !keyId ||
+      !keySecret ||
+      keyId.includes('placeholder') ||
+      keySecret.includes('placeholder')
+
     const amountInPaise = Math.round(Number(booking.total_amount) * 100)
 
     // Check if Razorpay API keys are configured
-    if (!keyId || !keySecret) {
-      // In development mode without credentials:
+    if (isPlaceholder) {
+      // In development test mode:
       return NextResponse.json({
         isDevelopmentMode: true,
-        message:
-          'Razorpay API credentials not configured in environment. Running in development test mode.',
+        gateway: 'razorpay',
+        message: 'Razorpay API credentials not configured in environment. Running in development test mode.',
         order: {
-          id: 'order_dev_' + Math.random().toString(36).substring(2, 10),
+          id: 'order_rzp_dev_' + Math.random().toString(36).substring(2, 10),
           amount: amountInPaise,
           currency: 'INR',
           bookingId: booking.id,
@@ -47,7 +57,7 @@ export async function POST(request: Request) {
       })
     }
 
-    // Call real Razorpay API using dynamic import or fetch
+    // Call real Razorpay API using dynamic import or REST API
     const Razorpay = (await import('razorpay')).default
     const razorpay = new Razorpay({
       key_id: keyId,
@@ -68,11 +78,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       isDevelopmentMode: false,
+      gateway: 'razorpay',
       order,
       keyId,
     })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Razorpay Create Order Error:', err)
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
   }
 }
-

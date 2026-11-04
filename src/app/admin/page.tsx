@@ -214,9 +214,9 @@ export default function AdminOverviewPage() {
               </div>
               <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
             </div>
-            <h3 className="font-bold text-base text-gray-900">Razorpay Payments & Escrow</h3>
+            <h3 className="font-bold text-base text-gray-900">Cashfree & Razorpay Payments & Escrow</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Monitor customer transactions, commission splits, and automated bank payouts.
+              Monitor Cashfree & Razorpay transactions, commission splits, and automated bank payouts.
             </p>
           </Link>
         </div>

@@ -32,16 +32,27 @@ export function MapDisplay({
       style={{ height }}
     >
       {apiKey ? (
-        <iframe
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          style={{ border: 0 }}
-          src={`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${locationQuery}&zoom=${zoom}`}
-          allowFullScreen
-          loading="lazy"
-          title="Service Location Map"
-        />
+        <>
+          <iframe
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            style={{ border: 0 }}
+            src={`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${locationQuery}&zoom=${zoom}`}
+            allowFullScreen
+            loading="lazy"
+            title="Service Location Map"
+          />
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${locationQuery}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 z-10 inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-md shadow-md text-xs font-bold text-gray-800 hover:text-[#ff7a00] border border-gray-200 hover:border-orange-300 transition-all"
+          >
+            <Navigation className="w-3.5 h-3.5 text-[#ff7a00]" />
+            <span>Open Directions ↗</span>
+          </a>
+        </>
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-gray-50 to-gray-100">
           <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 shadow-sm">
