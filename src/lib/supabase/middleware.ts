@@ -8,7 +8,21 @@ const DEFAULT_SERVICE_ROLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZHR4ZG13emtram94bWl6Z2plIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzcwOTkyOSwiZXhwIjoyMTA5Mjg1OTI5fQ.bfrgLYrm-iA_DxTjPqP7t5ZiU8Hly3WRcee-6Fj60JQ'
 
 export async function updateSession(request: NextRequest) {
-  // If an OAuth authorization code lands on ANY route (especially / fallback from Supabase Site URL):
+  // 1. Canonicalize any Netlify preview hash deployments to the production domain
+  const hostname = request.nextUrl.hostname
+  if (
+    hostname.endsWith('.netlify.app') &&
+    hostname !== 'hourlytourism.netlify.app' &&
+    !hostname.includes('localhost')
+  ) {
+    const canonicalUrl = new URL(
+      request.nextUrl.pathname + request.nextUrl.search,
+      'https://hourlytourism.netlify.app'
+    )
+    return NextResponse.redirect(canonicalUrl)
+  }
+
+  // 2. If an OAuth authorization code lands on ANY route (especially / fallback from Supabase Site URL):
   const code = request.nextUrl.searchParams.get('code')
   if (code && request.nextUrl.pathname !== '/auth/callback') {
     const callbackUrl = new URL('/auth/callback', request.url)

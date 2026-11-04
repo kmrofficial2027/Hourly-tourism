@@ -12,8 +12,11 @@ export async function GET(request: Request) {
   const oauthError = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Dynamic origin matching the current browser request (preserves cookies whether on Netlify or localhost)
-  const siteOrigin = requestUrl.origin
+  // Dynamic origin matching the current browser request (canonicalize Netlify previews)
+  let siteOrigin = requestUrl.origin
+  if (siteOrigin.includes('.netlify.app')) {
+    siteOrigin = 'https://hourlytourism.netlify.app'
+  }
 
   // Handle incoming OAuth errors directly from Google/Supabase
   if (oauthError || errorDescription) {

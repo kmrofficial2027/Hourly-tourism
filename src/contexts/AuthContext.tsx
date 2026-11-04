@@ -240,8 +240,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    // Dynamic redirect URL matching current browser origin to prevent PKCE code verifier loss
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
+    // Canonicalize Netlify preview deployments to production domain to prevent cookie fragmentation
+    let origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
+    if (origin.includes('.netlify.app')) {
+      origin = 'https://hourlytourism.netlify.app'
+    }
     const redirectTo = `${origin}/auth/callback`
 
     try {
