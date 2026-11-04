@@ -44,3 +44,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ exists: false, error: err.message }, { status: 500 })
   }
 }
+
