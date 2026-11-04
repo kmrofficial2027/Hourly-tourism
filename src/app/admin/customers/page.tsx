@@ -131,7 +131,7 @@ export default function AdminCustomersPage() {
 
           <div className="flex items-center space-x-3">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={loadCustomers}
               disabled={loading}
@@ -362,7 +362,7 @@ export default function AdminCustomersPage() {
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end space-x-1.5">
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => setSelectedCustomer(customer)}
                             className="text-[11px] h-7 px-2.5"
@@ -481,7 +481,7 @@ export default function AdminCustomersPage() {
               {/* Action buttons in modal */}
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => setSelectedCustomer(null)}
                 >

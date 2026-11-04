@@ -220,7 +220,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
 
-    const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
+    const rawOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+    const origin = rawOrigin.includes('hourlytourism.netlify.app')
+      ? 'https://hourlytourism.netlify.app'
+      : (rawOrigin || process.env.NEXT_PUBLIC_APP_URL || 'https://hourlytourism.netlify.app')
+
+    const redirectTo = `${origin}/auth/callback?redirect=${encodeURIComponent(
       redirectPath || ''
     )}&role=${role}`
 

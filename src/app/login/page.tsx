@@ -114,8 +114,17 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (searchParams.get('error') === 'oauth_failed') {
-      setError('Google authentication was cancelled or could not be completed.')
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      if (errorParam === 'oauth_failed') {
+        setError('Google authentication was cancelled or could not be completed.')
+      } else if (errorParam === 'missing_code') {
+        setError('Google authentication did not return an authorization code. Please try again.')
+      } else if (errorParam === 'session_not_created') {
+        setError('Failed to establish user session after Google login. Please check Supabase Auth settings.')
+      } else {
+        setError(`Google Sign-In: ${decodeURIComponent(errorParam)}`)
+      }
     }
   }, [searchParams])
 

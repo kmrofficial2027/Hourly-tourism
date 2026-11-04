@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, Suspense } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -65,6 +65,19 @@ function SignUpForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      if (errorParam === 'oauth_failed') {
+        setError('Google sign-up was cancelled or could not be completed.')
+      } else if (errorParam === 'missing_code') {
+        setError('Google sign-up did not return an authorization code. Please try again.')
+      } else {
+        setError(`Google Sign-Up: ${decodeURIComponent(errorParam)}`)
+      }
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
