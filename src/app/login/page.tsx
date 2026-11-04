@@ -133,11 +133,15 @@ function LoginForm() {
   // Auto-redirect if user is already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      let role = profile?.role || (user.user_metadata?.role as string) || selectedRole || 'customer'
+      // Prioritize profile role to ensure providers/companies reach their dedicated portals
+      const role = profile?.role || (user.user_metadata?.role as string)
+      if (!role && profile === undefined) return // Wait for profile fetch if still pending
+
+      const effectiveRole = role || selectedRole || 'customer'
       let dest = '/dashboard'
-      if (role === 'admin') dest = '/admin'
-      else if (role === 'provider') dest = '/provider'
-      else if (role === 'company') dest = '/company'
+      if (effectiveRole === 'admin') dest = '/admin'
+      else if (effectiveRole === 'provider') dest = '/provider'
+      else if (effectiveRole === 'company') dest = '/company'
 
       const target =
         redirectPath &&
@@ -160,18 +164,8 @@ function LoginForm() {
         setError('Google authentication did not return an authorization code. Please try again.')
       } else if (errorParam === 'session_not_created') {
         setError('Failed to establish user session after Google login. Please check Supabase Auth settings.')
-      } else if (
-        errorParam.includes('PKCE') ||
-        errorParam.includes('code challenge') ||
-        errorParam.includes('verifier') ||
-        errorParam.includes('flow_state')
-      ) {
-        setError('Previous sign-in session expired or was interrupted. Please click "Continue with Google" again or sign in with your email below.')
-        if (typeof window !== 'undefined') {
-          window.history.replaceState({}, '', window.location.pathname)
-        }
       } else {
-        setError(`Google Sign-In: ${decodeURIComponent(errorParam)}`)
+        setError(decodeURIComponent(errorParam))
       }
     }
   }, [searchParams])
@@ -481,8 +475,16 @@ function LoginForm() {
             </div>
 
             {error && (
-              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium leading-relaxed">
-                {error}
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium leading-relaxed flex items-start justify-between gap-2">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-400 hover:text-red-700 font-bold ml-1 flex-shrink-0"
+                  aria-label="Dismiss error"
+                >
+                  ✕
+                </button>
               </div>
             )}
 

@@ -94,7 +94,7 @@ export async function updateSession(request: NextRequest) {
           })
           const profData = await res.json()
           role = profData?.[0]?.role
-        } catch {}
+        } catch { }
       }
 
       let dest = '/dashboard'
@@ -134,7 +134,7 @@ export async function updateSession(request: NextRequest) {
               hasAccess = true
             }
           }
-        } catch {}
+        } catch { }
 
         if (!hasAccess) {
           return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -162,7 +162,7 @@ export async function updateSession(request: NextRequest) {
               hasAccess = true
             }
           }
-        } catch {}
+        } catch { }
 
         if (!hasAccess) {
           return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -180,7 +180,7 @@ export async function updateSession(request: NextRequest) {
           if (profData?.[0]?.role === 'admin') {
             isAdmin = true
           }
-        } catch {}
+        } catch { }
 
         if (!isAdmin) {
           return NextResponse.redirect(new URL('/dashboard', request.url))

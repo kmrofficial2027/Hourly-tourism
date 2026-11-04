@@ -91,17 +91,57 @@ export async function GET(request: Request) {
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (exchangeError) {
-      console.error('OAuth exchangeCodeForSession error:', exchangeError)
-      const errResponse = NextResponse.redirect(
-        `${siteOrigin}/login?error=${encodeURIComponent(exchangeError.message || 'exchange_failed')}`
-      )
-      // Clear out any contaminated or mismatched code-verifier cookies
-      cookieStore.getAll().forEach((cookie) => {
-        if (cookie.name.includes('code-verifier') || cookie.name.includes('auth-token')) {
-          errResponse.cookies.set(cookie.name, '', { maxAge: 0, path: '/' })
+      console.warn('Server OAuth exchangeCodeForSession encountered issue, delegating to client-side fallback:', exchangeError.message)
+      // Provide robust client-side exchange fallback so browser's local cookie context can complete the session
+      const fallbackHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing in - Hourly Tourism</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fafafa; }
+    .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); text-align: center; max-width: 380px; width: 90%; }
+    .spinner { width: 42px; height: 42px; border: 4px solid #e5e7eb; border-top-color: #0a4d29; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h2 { font-size: 1.15rem; color: #111827; margin: 0 0 0.5rem; font-weight: 700; }
+    p { font-size: 0.85rem; color: #6b7280; margin: 0; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>Verifying Credentials</h2>
+    <p>Completing secure sign-in to Hourly Tourism...</p>
+  </div>
+  <script>
+    (async function() {
+      try {
+        const client = window.supabase.createClient('${url}', '${anonKey}');
+        const { data, error } = await client.auth.exchangeCodeForSession('${code}');
+        if (!error && data?.session) {
+          try {
+            await fetch('/api/auth/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: '${effectiveRole}', fullName: data.user?.user_metadata?.full_name })
+            });
+          } catch (_) {}
+          window.location.replace('${siteOrigin}${targetPath}');
+        } else {
+          window.location.replace('${siteOrigin}/login?error=' + encodeURIComponent(error ? error.message : '${exchangeError.message}'));
         }
+      } catch (err) {
+        window.location.replace('${siteOrigin}/login?error=' + encodeURIComponent(err.message || 'Authentication error'));
+      }
+    })();
+  </script>
+</body>
+</html>`
+      return new NextResponse(fallbackHtml, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
-      return errResponse
     }
 
     if (data?.user) {

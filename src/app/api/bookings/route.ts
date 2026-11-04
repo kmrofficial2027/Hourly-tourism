@@ -60,8 +60,10 @@ export async function POST(request: Request) {
       }
     }
 
+    const adminSupabase = await createAdminSupabaseClient()
+
     // Get listing to retrieve provider_id or company_id
-    const { data: listing } = await supabase
+    const { data: listing } = await adminSupabase
       .from('service_listings')
       .select('provider_id, company_id')
       .eq('id', listingId)
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
       payment_status: 'pending',
     }
 
-    const { data: booking, error: insertError } = await supabase
+    const { data: booking, error: insertError } = await adminSupabase
       .from('bookings')
       .insert(bookingPayload)
       .select('*')

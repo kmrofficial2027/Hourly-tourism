@@ -222,16 +222,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
 
-    // Clear any previous stale code-verifier cookies to prevent "code challenge does not match" errors
+    // Store role and redirect destination in cookies and localStorage for the OAuth callback
     if (typeof document !== 'undefined') {
-      document.cookie.split(';').forEach((cookie) => {
-        const name = cookie.split('=')[0].trim()
-        if (name.includes('code-verifier')) {
-          document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-        }
-      })
-
-      // Store role and redirect destination in cookies and localStorage for the OAuth callback
       document.cookie = `ht_auth_role=${encodeURIComponent(role)}; path=/; max-age=600; SameSite=Lax`
       document.cookie = `ht_auth_redirect=${encodeURIComponent(redirectPath || '')}; path=/; max-age=600; SameSite=Lax`
       try {
@@ -240,11 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    // Canonicalize Netlify preview deployments to production domain to prevent cookie fragmentation
-    let origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
-    if (origin.includes('.netlify.app')) {
-      origin = 'https://hourlytourism.netlify.app'
-    }
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
     const redirectTo = `${origin}/auth/callback`
 
     try {

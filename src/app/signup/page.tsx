@@ -171,9 +171,11 @@ function SignUpForm() {
       showToast.success('Account created successfully!')
       let target = '/dashboard'
       if (role === 'provider') {
-        target = '/become-provider'
+        target = '/provider'
       } else if (role === 'company') {
         target = '/company'
+      } else if (role === 'admin') {
+        target = '/admin'
       }
 
       window.location.href = target
