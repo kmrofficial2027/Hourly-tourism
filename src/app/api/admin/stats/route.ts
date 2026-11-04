@@ -3,7 +3,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   try {
-    const adminSupabase = createAdminSupabaseClient()
+    const adminSupabase = await createAdminSupabaseClient()
 
     // Query live counts from PostgreSQL using service role for maximum speed
     const [

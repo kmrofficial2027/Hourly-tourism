@@ -97,7 +97,7 @@ const DEMO_CUSTOMERS = [
 
 export async function GET(request: Request) {
   try {
-    const adminSupabase = createAdminSupabaseClient()
+    const adminSupabase = await createAdminSupabaseClient()
     
     // Fetch live customers from Supabase profiles
     const { data: liveProfiles, error } = await adminSupabase
@@ -178,7 +178,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing customerId or status' }, { status: 400 })
     }
 
-    const adminSupabase = createAdminSupabaseClient()
+    const adminSupabase = await createAdminSupabaseClient()
     const isActive = status === 'active'
 
     // Update in profiles if customer is a live Supabase user

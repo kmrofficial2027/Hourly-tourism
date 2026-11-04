@@ -7,6 +7,8 @@ const variants = {
     'bg-gradient-to-r from-[#ff7a00] to-[#f59e0b] text-white hover:from-[#ea6f00] hover:to-[#d97706] focus:ring-orange-400 shadow-md shadow-orange-200/50',
   secondary:
     'bg-white text-[#15803d] border-2 border-[#15803d] hover:bg-green-50 focus:ring-green-500 shadow-sm',
+  outline:
+    'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-400 shadow-sm',
   danger:
     'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm',
   ghost:

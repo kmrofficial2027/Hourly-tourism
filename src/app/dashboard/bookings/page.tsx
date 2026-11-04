@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Download,
   MessageCircle,
+  ShieldCheck,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
