@@ -14,7 +14,11 @@ export function createClient() {
     envKey && !envKey.includes('placeholder') ? envKey : DEFAULT_SUPABASE_ANON_KEY
 
   return createBrowserClient(url, anonKey, {
-    cookieEncoding: 'raw',
+    cookieOptions: {
+      path: '/',
+      sameSite: 'lax',
+      secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+    },
   })
 }
 
