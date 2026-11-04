@@ -70,8 +70,8 @@ export default function BecomeProviderPage() {
       setSuccess(true)
       showToast.success('Provider onboarding submitted! Redirecting to provider portal...')
       setTimeout(() => {
-        router.push(providerType === 'company' ? '/company' : '/provider')
-      }, 1500)
+        window.location.href = providerType === 'company' ? '/company' : '/provider'
+      }, 1200)
     } catch (err: any) {
       showToast.error(err.message || 'Error submitting application')
     } finally {

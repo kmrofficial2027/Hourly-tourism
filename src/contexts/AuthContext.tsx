@@ -192,14 +192,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.user) {
-      // Upsert profile in Supabase profiles table
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        email,
-        full_name: fullName,
-        role,
-        is_active: true,
-      })
+      // Upsert profile and sync user_metadata via server admin API to bypass any client RLS restrictions
+      try {
+        await fetch('/api/auth/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role, fullName }),
+        })
+      } catch (syncErr) {
+        console.warn('Sync profile error:', syncErr)
+      }
 
       cachedUser = data.user
       setUser(data.user)
@@ -230,8 +232,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    // Clean canonical redirect URL with zero query parameters to prevent Supabase allowlist mismatch
-    const redirectTo = 'https://hourlytourism.netlify.app/auth/callback'
+    // Dynamic redirect URL matching current browser origin to prevent PKCE code verifier loss
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
+    const redirectTo = `${origin}/auth/callback`
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({

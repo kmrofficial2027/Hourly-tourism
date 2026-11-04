@@ -100,7 +100,7 @@ function LoginForm() {
   const redirectPath = searchParams.get('redirect')
   const initialRoleParam = searchParams.get('role') as PublicRole | null
 
-  const { signIn, signInWithGoogle } = useAuth()
+  const { user, profile, signIn, signInWithGoogle, loading: authLoading } = useAuth()
 
   // Selected Login Mode (Customer, Provider, Company)
   const [selectedRole, setSelectedRole] = useState<PublicRole>(
@@ -113,6 +113,27 @@ function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Auto-redirect if user is already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      let role = profile?.role || (user.user_metadata?.role as string) || selectedRole || 'customer'
+      let dest = '/dashboard'
+      if (role === 'admin') dest = '/admin'
+      else if (role === 'provider') dest = '/provider'
+      else if (role === 'company') dest = '/company'
+
+      const target =
+        redirectPath &&
+        redirectPath.startsWith('/') &&
+        redirectPath !== '/login' &&
+        redirectPath !== '/signup'
+          ? redirectPath
+          : dest
+
+      window.location.href = target
+    }
+  }, [user, profile, authLoading, redirectPath, selectedRole])
+
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
@@ -122,6 +143,8 @@ function LoginForm() {
         setError('Google authentication did not return an authorization code. Please try again.')
       } else if (errorParam === 'session_not_created') {
         setError('Failed to establish user session after Google login. Please check Supabase Auth settings.')
+      } else if (errorParam.includes('PKCE')) {
+        setError('Previous sign-in session was refreshed. Please enter your email and password below or click Continue with Google.')
       } else {
         setError(`Google Sign-In: ${decodeURIComponent(errorParam)}`)
       }
@@ -142,12 +165,35 @@ function LoginForm() {
         throw new Error(res.error)
       }
 
+      // Synchronize role with server to guarantee appropriate dashboard access
+      let targetPortal = currentRoleConfig.targetUrl
+      try {
+        const syncRes = await fetch('/api/auth/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: selectedRole }),
+        })
+        if (syncRes.ok) {
+          const syncData = await syncRes.json()
+          if (syncData.role === 'admin') targetPortal = '/admin'
+          else if (syncData.role === 'provider') targetPortal = '/provider'
+          else if (syncData.role === 'company') targetPortal = '/company'
+          else if (syncData.role === 'customer') targetPortal = '/dashboard'
+        }
+      } catch {}
+
       showToast.success(`Welcome back! Redirecting to ${currentRoleConfig.badge}...`)
 
       // If user came with a specific redirect, use it; otherwise use the role portal
-      const target = redirectPath || currentRoleConfig.targetUrl
-      router.push(target)
-      router.refresh()
+      const target =
+        redirectPath &&
+        redirectPath.startsWith('/') &&
+        redirectPath !== '/login' &&
+        redirectPath !== '/signup'
+          ? redirectPath
+          : targetPortal
+
+      window.location.href = target
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.')
       showToast.error(err.message || 'Login failed')

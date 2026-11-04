@@ -48,19 +48,18 @@ export default function AdminLoginPage() {
         throw new Error('Authentication failed.')
       }
 
-      // 2. Strict Role Verification in profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, full_name')
-        .eq('id', authData.user.id)
-        .single()
+      // 2. Strict Role Verification via server API to bypass any client RLS issues
+      let userRole: string | null = (authData.user.user_metadata?.role as string) || null
 
-      if (profileError || !profile) {
-        await supabase.auth.signOut()
-        throw new Error('Unable to retrieve administrator security profile.')
-      }
+      try {
+        const verifyRes = await fetch('/api/auth/sync')
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json()
+          userRole = verifyData.role
+        }
+      } catch {}
 
-      if (profile.role !== 'admin') {
+      if (userRole !== 'admin') {
         // Immediate sign out and reject
         await supabase.auth.signOut()
         throw new Error(
@@ -69,8 +68,7 @@ export default function AdminLoginPage() {
       }
 
       showToast.success('Admin clearance confirmed. Accessing Console...')
-      router.push('/admin')
-      router.refresh()
+      window.location.href = '/admin'
     } catch (err: any) {
       setError(err.message || 'Authentication error.')
       showToast.error(err.message || 'Admin authentication failed')

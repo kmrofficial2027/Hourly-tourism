@@ -8,12 +8,12 @@ export async function GET(request: Request) {
   const searchParams = requestUrl.searchParams
   const code = searchParams.get('code')
   const redirectParam = searchParams.get('redirect')
-  const role = searchParams.get('role') || 'customer'
+  const roleParam = searchParams.get('role')
   const oauthError = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Always redirect to the canonical Netlify production domain
-  const siteOrigin = 'https://hourlytourism.netlify.app'
+  // Dynamic origin matching the current browser request (preserves cookies whether on Netlify or localhost)
+  const siteOrigin = requestUrl.origin
 
   // Handle incoming OAuth errors directly from Google/Supabase
   if (oauthError || errorDescription) {
@@ -39,10 +39,10 @@ export async function GET(request: Request) {
   const cookieRole = cookieStore.get('ht_auth_role')?.value
   const cookieRedirect = cookieStore.get('ht_auth_redirect')?.value
 
-  const effectiveRole = searchParams.get('role') || cookieRole || role || 'customer'
+  const effectiveRole = roleParam || cookieRole || 'customer'
   const rawRedirect = searchParams.get('redirect') || cookieRedirect || redirectParam
 
-  // Prepare destination
+  // Default target path
   let targetPath = '/dashboard'
   if (effectiveRole === 'admin') targetPath = '/admin'
   else if (effectiveRole === 'provider') targetPath = '/provider'
@@ -52,13 +52,14 @@ export async function GET(request: Request) {
     rawRedirect &&
     rawRedirect.startsWith('/') &&
     rawRedirect !== '/login' &&
+    rawRedirect !== '/signup' &&
     rawRedirect !== '/null' &&
     rawRedirect !== '/undefined'
   ) {
     targetPath = rawRedirect
   }
 
-  // Create redirect response upfront so cookies can be attached to it
+  // Create initial redirect response so cookies can be set
   const response = NextResponse.redirect(`${siteOrigin}${targetPath}`)
 
   // Clean temporary auth cookies
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
             try {
               cookieStore.set(name, value, options)
             } catch {
-              // Ignore in edge/server component context
+              // Ignore in edge context
             }
             response.cookies.set(name, value, options)
           })
@@ -94,17 +95,33 @@ export async function GET(request: Request) {
     }
 
     if (data?.user) {
-      // Check or create profile using admin client to bypass any RLS policy issues
       try {
         const adminSupabase = await createAdminSupabaseClient()
+
+        // 1. Fetch existing profile
         const { data: existingProfile } = await adminSupabase
           .from('profiles')
           .select('id, role')
           .eq('id', data.user.id)
-          .single()
+          .maybeSingle()
+
+        // 2. Fetch provider & company profiles
+        const { data: provRow } = await adminSupabase
+          .from('provider_profiles')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .maybeSingle()
+
+        const { data: compRow } = await adminSupabase
+          .from('company_profiles')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .maybeSingle()
+
+        const userMeta = data.user.user_metadata || {}
 
         if (!existingProfile) {
-          const userMeta = data.user.user_metadata || {}
+          // New user registration via Google OAuth
           await adminSupabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
@@ -119,15 +136,66 @@ export async function GET(request: Request) {
             email_verified: true,
             phone_verified: false,
           })
-        } else if (existingProfile.role) {
-          // Adjust destination based on actual database role if no specific deep link was requested
-          if (!rawRedirect || rawRedirect === '/') {
-            if (existingProfile.role === 'admin') targetPath = '/admin'
-            else if (existingProfile.role === 'provider') targetPath = '/provider'
-            else if (existingProfile.role === 'company') targetPath = '/company'
+
+          if (effectiveRole === 'provider') {
+            await adminSupabase.from('provider_profiles').insert({
+              user_id: data.user.id,
+              verification_status: 'pending',
+              business_name: userMeta.full_name || userMeta.name || 'Independent Host',
+            })
+          } else if (effectiveRole === 'company') {
+            await adminSupabase.from('company_profiles').insert({
+              user_id: data.user.id,
+              company_name: userMeta.full_name || userMeta.name || 'Company Fleet',
+              verification_status: 'approved',
+            })
+          }
+
+          // Persist role into auth.users metadata
+          await adminSupabase.auth.admin.updateUserById(data.user.id, {
+            user_metadata: { ...userMeta, role: effectiveRole },
+          })
+        } else {
+          // Existing user login: determine their real role
+          let realRole = existingProfile.role
+          if (compRow) realRole = 'company'
+          else if (provRow && realRole !== 'company') realRole = 'provider'
+
+          // If the user deliberately selected Provider or Company login tab, ensure they have the role
+          if (effectiveRole === 'provider' && realRole !== 'admin' && realRole !== 'company') {
+            realRole = 'provider'
+            await adminSupabase.from('profiles').update({ role: 'provider' }).eq('id', data.user.id)
+            if (!provRow) {
+              await adminSupabase.from('provider_profiles').insert({
+                user_id: data.user.id,
+                verification_status: 'pending',
+                business_name: userMeta.full_name || 'Independent Host',
+              })
+            }
+          } else if (effectiveRole === 'company' && realRole !== 'admin') {
+            realRole = 'company'
+            await adminSupabase.from('profiles').update({ role: 'company' }).eq('id', data.user.id)
+            if (!compRow) {
+              await adminSupabase.from('company_profiles').insert({
+                user_id: data.user.id,
+                company_name: userMeta.full_name || 'Company Fleet',
+                verification_status: 'approved',
+              })
+            }
+          }
+
+          // Sync into user_metadata
+          await adminSupabase.auth.admin.updateUserById(data.user.id, {
+            user_metadata: { ...userMeta, role: realRole },
+          })
+
+          // Update destination if no explicit deep link was specified
+          if (!rawRedirect || rawRedirect === '/' || rawRedirect === '/dashboard') {
+            if (realRole === 'admin') targetPath = '/admin'
+            else if (realRole === 'provider') targetPath = '/provider'
+            else if (realRole === 'company') targetPath = '/company'
             else targetPath = '/dashboard'
 
-            // Update Location header on the response
             response.headers.set('Location', `${siteOrigin}${targetPath}`)
           }
         }
@@ -146,5 +214,3 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(`${siteOrigin}/login?error=session_not_created`)
 }
-
-

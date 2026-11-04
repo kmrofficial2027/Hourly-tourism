@@ -51,7 +51,7 @@ function SignUpForm() {
   const searchParams = useSearchParams()
   const initialRoleParam = searchParams.get('role') as UserRole | null
 
-  const { signUp, signInWithGoogle } = useAuth()
+  const { user, profile, signUp, signInWithGoogle, loading: authLoading } = useAuth()
 
   const [role, setRole] = useState<UserRole>(
     initialRoleParam && ['customer', 'provider', 'company'].includes(initialRoleParam)
@@ -66,6 +66,18 @@ function SignUpForm() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Auto-redirect if user is already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      let userRole = profile?.role || (user.user_metadata?.role as string) || 'customer'
+      let target = '/dashboard'
+      if (userRole === 'admin') target = '/admin'
+      else if (userRole === 'provider') target = '/provider'
+      else if (userRole === 'company') target = '/company'
+      window.location.href = target
+    }
+  }, [user, profile, authLoading])
+
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
@@ -73,6 +85,8 @@ function SignUpForm() {
         setError('Google sign-up was cancelled or could not be completed.')
       } else if (errorParam === 'missing_code') {
         setError('Google sign-up did not return an authorization code. Please try again.')
+      } else if (errorParam.includes('PKCE')) {
+        setError('Previous sign-up session was refreshed. Please register below with Email & Password or try Google Sign-Up again.')
       } else {
         setError(`Google Sign-Up: ${decodeURIComponent(errorParam)}`)
       }
@@ -95,15 +109,24 @@ function SignUpForm() {
         throw new Error(res.error)
       }
 
+      // Synchronize role and create provider/company draft record
+      try {
+        await fetch('/api/auth/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role, fullName, phone }),
+        })
+      } catch {}
+
       showToast.success('Account created successfully!')
+      let target = '/dashboard'
       if (role === 'provider') {
-        router.push('/become-provider')
+        target = '/become-provider'
       } else if (role === 'company') {
-        router.push('/company')
-      } else {
-        router.push('/dashboard')
+        target = '/company'
       }
-      router.refresh()
+
+      window.location.href = target
     } catch (err: any) {
       setError(err.message || 'Error signing up')
       showToast.error(err.message || 'Error creating account')

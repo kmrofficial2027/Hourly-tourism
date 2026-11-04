@@ -101,6 +101,15 @@ export async function PATCH(request: Request) {
           .update({ is_active: true, role: 'provider' })
           .eq('id', targetUserId)
 
+        // Sync role into auth.users metadata as well
+        try {
+          await adminSupabase.auth.admin.updateUserById(targetUserId, {
+            user_metadata: { role: 'provider' },
+          })
+        } catch (authMetaErr) {
+          console.warn('Non-fatal user metadata sync note:', authMetaErr)
+        }
+
         // Insert notification with valid enum type 'provider_status'
         try {
           await adminSupabase.from('notifications').insert({
