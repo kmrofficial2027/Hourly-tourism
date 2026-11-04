@@ -31,16 +31,23 @@ export default function ProviderOverviewPage() {
   })
 
   const [recentRequests, setRecentRequests] = useState<any[]>([])
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadData() {
       setLoading(true)
       try {
-        const [bookingsRes, servicesRes] = await Promise.all([
+        const [bookingsRes, servicesRes, verifRes] = await Promise.all([
           fetch('/api/bookings?role=provider'),
           fetch('/api/services'),
+          fetch('/api/provider/verification'),
         ])
+
+        if (verifRes.ok) {
+          const vData = await verifRes.json()
+          setVerificationStatus(vData.verification_status || 'unsubmitted')
+        }
 
         let bookings: any[] = []
         let listingsCount = 0
@@ -106,6 +113,54 @@ export default function ProviderOverviewPage() {
             </Link>
           </div>
         </div>
+
+        {/* Verification Status Notice if not verified */}
+        {verificationStatus && verificationStatus !== 'verified' && (
+          <div
+            className={`p-5 rounded-3xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+              verificationStatus === 'pending'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+            }`}
+          >
+            <div className="flex items-center space-x-3.5">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                  verificationStatus === 'pending'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-emerald-700 text-white'
+                }`}
+              >
+                {verificationStatus === 'pending' ? (
+                  <Clock className="w-5 h-5 animate-pulse" />
+                ) : (
+                  <ShieldCheck className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h4 className="font-bold text-sm">
+                  {verificationStatus === 'pending'
+                    ? 'Aadhaar ID & Live Selfie Verification Pending Admin Approval'
+                    : 'Identity Verification Required for Marketplace Listings'}
+                </h4>
+                <p className="text-xs opacity-80 mt-0.5">
+                  {verificationStatus === 'pending'
+                    ? 'Your documents have been submitted. Admin is reviewing your Aadhaar and live photo before activating your listing capabilities.'
+                    : 'Upload your Aadhaar Card and capture a live facial selfie to get verified and approved by Admin.'}
+                </p>
+              </div>
+            </div>
+
+            <Link href="/provider/verification" className="flex-shrink-0">
+              <Button
+                variant={verificationStatus === 'pending' ? 'secondary' : 'primary'}
+                size="sm"
+              >
+                {verificationStatus === 'pending' ? 'View Status' : 'Verify Identity Now'}
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* 4 Core Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

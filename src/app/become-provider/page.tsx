@@ -111,14 +111,21 @@ export default function BecomeProviderPage() {
                 Welcome to Hourly Tourism Partner Network!
               </h2>
               <p className="text-sm text-gray-500 max-w-md mx-auto">
-                Your provider profile has been initiated. Our team will review your verification
-                documents within 24 hours.
+                Your partner account is registered. Next, upload your Aadhaar ID proof and capture a live selfie photo to submit for Admin approval.
               </p>
-              <Link href="/provider">
-                <Button variant="primary" className="mt-4">
-                  Open Provider Dashboard
-                </Button>
-              </Link>
+              <div className="flex flex-wrap justify-center gap-3 pt-2">
+                <Link href="/provider/verification">
+                  <Button variant="primary">
+                    <ShieldCheck className="w-4 h-4 mr-1.5" />
+                    Upload ID & Take Live Selfie
+                  </Button>
+                </Link>
+                <Link href="/provider">
+                  <Button variant="secondary">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">

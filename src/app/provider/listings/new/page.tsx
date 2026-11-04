@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   Clock,
   Sparkles,
+  AlertCircle,
+  ArrowRight,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Input } from '@/components/ui/Input'
@@ -72,6 +74,25 @@ export default function NewListingPage() {
   ])
 
   const [loading, setLoading] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null)
+  const [checkingVerification, setCheckingVerification] = useState(true)
+
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/provider/verification')
+        if (res.ok) {
+          const data = await res.json()
+          setVerificationStatus(data.verification_status || 'unsubmitted')
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setCheckingVerification(false)
+      }
+    }
+    checkStatus()
+  }, [])
 
   const isVehicle = ['bike', 'car', 'van'].includes(category)
 
@@ -159,6 +180,50 @@ export default function NewListingPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!checkingVerification && verificationStatus !== 'verified') {
+    return (
+      <DashboardLayout role="provider" title="Account Approval Required">
+        <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
+          <div
+            className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-sm ${
+              verificationStatus === 'pending'
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-emerald-100 text-emerald-800'
+            }`}
+          >
+            {verificationStatus === 'pending' ? (
+              <Clock className="w-10 h-10 animate-pulse" />
+            ) : (
+              <ShieldCheck className="w-10 h-10" />
+            )}
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-black text-gray-900 font-display">
+              {verificationStatus === 'pending'
+                ? 'Your Account is Pending Admin Approval'
+                : 'Identity Verification Required to Add Listings'}
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 max-w-lg mx-auto leading-relaxed">
+              {verificationStatus === 'pending'
+                ? 'Your Aadhaar / ID proof and live selfie photo have been submitted and are under review by our Admin compliance team. Once approved, you will immediately have full access to publish listings in the Hourly Tourism marketplace.'
+                : 'To maintain tourist safety and verified host standards, all providers must upload their Aadhaar / Government ID proof and a live selfie before publishing listings.'}
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center gap-3">
+            <Link href="/provider/verification">
+              <Button variant="primary" size="lg">
+                <ShieldCheck className="w-4 h-4 mr-1.5" />
+                {verificationStatus === 'pending'
+                  ? 'Check Verification Status'
+                  : 'Submit ID & Live Photo for Approval'}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
