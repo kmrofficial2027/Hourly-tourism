@@ -22,33 +22,33 @@ export function Logo({
     switch (variant) {
       case 'header':
         return {
-          container: 'h-11 sm:h-12 flex items-center',
-          image: 'h-10 sm:h-11 w-auto object-contain',
+          container: 'h-14 sm:h-16 lg:h-20 flex items-center',
+          image: 'h-12 sm:h-14 lg:h-18 w-auto object-contain',
         }
       case 'footer':
         return {
-          container: 'h-14 sm:h-16 flex items-center',
-          image: 'h-12 sm:h-14 w-auto object-contain',
+          container: 'h-18 sm:h-22 flex items-center',
+          image: 'h-16 sm:h-20 w-auto object-contain',
         }
       case 'hero':
         return {
-          container: 'h-20 sm:h-24 flex items-center',
-          image: 'h-18 sm:h-20 w-auto object-contain drop-shadow-md',
+          container: 'h-24 sm:h-28 md:h-36 flex items-center justify-center',
+          image: 'h-22 sm:h-26 md:h-32 w-auto object-contain drop-shadow-md',
         }
       case 'compact':
         return {
-          container: 'h-9 flex items-center',
-          image: 'h-8 w-auto object-contain',
+          container: 'h-12 sm:h-14 flex items-center',
+          image: 'h-11 sm:h-13 w-auto object-contain',
         }
       case 'icon':
         return {
-          container: 'w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
-          image: 'w-full h-full object-cover scale-150',
+          container: 'w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
+          image: 'w-full h-full object-cover scale-125',
         }
       default:
         return {
-          container: 'h-11 flex items-center',
-          image: 'h-10 w-auto object-contain',
+          container: 'h-14 sm:h-16 lg:h-20 flex items-center',
+          image: 'h-12 sm:h-14 lg:h-18 w-auto object-contain',
         }
     }
   }

@@ -104,7 +104,7 @@ export default function AdminLoginPage() {
           {/* Logo with security shield */}
           <div className="text-center mb-6">
             <div className="inline-block p-3 rounded-2xl bg-white mb-4 shadow-lg">
-              <Logo variant="compact" />
+              <Logo variant="header" />
             </div>
 
             <div className="flex items-center justify-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">

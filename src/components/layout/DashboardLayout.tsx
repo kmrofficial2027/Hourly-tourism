@@ -191,7 +191,7 @@ export function DashboardLayout({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
+        <header className="h-16 sm:h-18 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -199,7 +199,10 @@ export function DashboardLayout({
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
+            <div className="lg:hidden flex items-center">
+              <Logo variant="compact" />
+            </div>
+            <h1 className="hidden sm:block text-lg sm:text-xl font-bold text-gray-900 truncate">
               {title || 'Dashboard'}
             </h1>
           </div>

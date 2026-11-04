@@ -16,11 +16,11 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-gray-800">
           {/* Brand info */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="inline-block bg-white rounded-2xl px-3.5 py-2 shadow-lg hover:scale-[1.02] transition-transform">
+            <Link href="/" className="inline-block bg-white rounded-2xl px-4 py-2.5 shadow-lg hover:scale-[1.02] transition-transform">
               <img
                 src="/images/logo.png"
                 alt="Hourly Tourism — Discover More. One Hour at a Time."
-                className="h-12 sm:h-14 w-auto object-contain"
+                className="h-16 sm:h-20 w-auto object-contain"
               />
             </Link>
             <p className="text-[#ff7a00] font-bold text-sm tracking-wide">

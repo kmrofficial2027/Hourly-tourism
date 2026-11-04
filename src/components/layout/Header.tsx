@@ -254,7 +254,7 @@ export function Header() {
         <div className="md:hidden bg-white border-b border-gray-200 px-4 pt-3 pb-6 animate-slide-down shadow-xl">
           {/* Logo in mobile drawer */}
           <div className="pb-3 mb-3 border-b border-gray-100 flex items-center">
-            <Logo variant="compact" />
+            <Logo variant="header" />
           </div>
           <nav className="flex flex-col space-y-2">
             {navLinks.map((link) => (
