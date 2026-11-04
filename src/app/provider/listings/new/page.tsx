@@ -182,7 +182,7 @@ export default function NewListingPage() {
     }
   }
 
-  if (!checkingVerification && verificationStatus !== 'verified') {
+  if (!checkingVerification && verificationStatus !== 'verified' && verificationStatus !== 'approved') {
     return (
       <DashboardLayout role="provider" title="Account Approval Required">
         <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">

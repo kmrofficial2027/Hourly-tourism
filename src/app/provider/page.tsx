@@ -115,7 +115,7 @@ export default function ProviderOverviewPage() {
         </div>
 
         {/* Verification Status Notice if not verified */}
-        {verificationStatus && verificationStatus !== 'verified' && (
+        {verificationStatus && verificationStatus !== 'verified' && verificationStatus !== 'approved' && (
           <div
             className={`p-5 rounded-3xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
               verificationStatus === 'pending'

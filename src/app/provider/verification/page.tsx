@@ -51,7 +51,7 @@ export default function ProviderVerificationPage() {
       if (res.ok) {
         const data = await res.json()
         const currentStatus = data.verification_status || 'unsubmitted'
-        setStatus(currentStatus)
+        setStatus(currentStatus === 'approved' ? 'verified' : currentStatus)
         if (data.documents) {
           setSubmittedDocs(data.documents)
           if (data.documents.id_number) setIdNumber(data.documents.id_number)

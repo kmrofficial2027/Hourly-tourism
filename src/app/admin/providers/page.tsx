@@ -65,14 +65,17 @@ export default function AdminProvidersPage() {
         }),
       })
 
-      if (!res.ok) throw new Error('Status update failed')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Status update failed')
+      }
 
       setProviders(
         providers.map((p) =>
           p.id === providerId
             ? {
                 ...p,
-                verification_status: newStatus === 'approved' ? 'verified' : 'rejected',
+                verification_status: newStatus === 'approved' ? 'approved' : 'rejected',
                 status: newStatus === 'approved' ? 'approved' : 'rejected',
               }
             : p
@@ -333,7 +336,7 @@ export default function AdminProvidersPage() {
                 <div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                      selectedProvider.verification_status === 'verified'
+                      selectedProvider.verification_status === 'approved' || selectedProvider.verification_status === 'verified'
                         ? 'bg-emerald-100 text-emerald-800'
                         : selectedProvider.verification_status === 'pending'
                         ? 'bg-amber-100 text-amber-800'

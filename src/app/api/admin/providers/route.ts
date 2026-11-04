@@ -56,14 +56,28 @@ export async function PATCH(request: Request) {
     }
 
     const adminSupabase = await createAdminSupabaseClient()
-    const verificationStatus = status === 'approved' ? 'verified' : 'rejected'
+    const verificationStatus = status === 'approved' ? 'approved' : 'rejected'
 
-    // Fetch provider to get user_id
-    const { data: provider } = await adminSupabase
+    // Fetch provider to get user_id (check by provider id or auth user_id)
+    let provider = null
+    const { data: pById } = await adminSupabase
       .from('provider_profiles')
       .select('*')
       .eq('id', providerId)
-      .single()
+      .maybeSingle()
+
+    if (pById) {
+      provider = pById
+    } else {
+      const { data: pByUserId } = await adminSupabase
+        .from('provider_profiles')
+        .select('*')
+        .eq('user_id', providerId)
+        .maybeSingle()
+      provider = pByUserId
+    }
+
+    const targetId = provider?.id || providerId
 
     const { error: updateErr } = await adminSupabase
       .from('provider_profiles')
@@ -71,41 +85,53 @@ export async function PATCH(request: Request) {
         verification_status: verificationStatus,
         verified_at: status === 'approved' ? new Date().toISOString() : null,
       })
-      .eq('id', providerId)
+      .eq('id', targetId)
 
-    if (updateErr) throw updateErr
+    if (updateErr) {
+      console.error('Update provider_profiles error:', updateErr)
+      throw new Error(updateErr.message || 'Failed to update provider status')
+    }
 
     // If approved, make sure user profile is active and role is provider
-    if (provider?.user_id) {
+    const targetUserId = provider?.user_id || providerId
+    if (targetUserId) {
       if (status === 'approved') {
         await adminSupabase
           .from('profiles')
           .update({ is_active: true, role: 'provider' })
-          .eq('id', provider.user_id)
+          .eq('id', targetUserId)
 
-        // Insert notification
-        await adminSupabase.from('notifications').insert({
-          user_id: provider.user_id,
-          title: '🎉 Account Approved!',
-          message: 'Congratulations! Your Aadhaar / ID proof and live photo have been approved by Admin. You can now publish hourly listings and receive bookings.',
-          type: 'account',
-          is_read: false,
-        })
+        // Insert notification with valid enum type 'provider_status'
+        try {
+          await adminSupabase.from('notifications').insert({
+            user_id: targetUserId,
+            title: '🎉 Account Approved!',
+            message: 'Congratulations! Your Aadhaar / ID proof and live photo have been approved by Admin. You can now publish hourly listings and receive bookings.',
+            type: 'provider_status',
+            is_read: false,
+          })
+        } catch (notifErr) {
+          console.error('Non-fatal notification error:', notifErr)
+        }
       } else {
         // Notification for rejection
-        await adminSupabase.from('notifications').insert({
-          user_id: provider.user_id,
-          title: 'Verification Not Approved',
-          message: rejectionReason
-            ? `Your verification request was rejected: ${rejectionReason}. Please re-submit clear documents.`
-            : 'Your verification request was rejected. Please re-submit clear ID proof and live selfie.',
-          type: 'account',
-          is_read: false,
-        })
+        try {
+          await adminSupabase.from('notifications').insert({
+            user_id: targetUserId,
+            title: 'Verification Not Approved',
+            message: rejectionReason
+              ? `Your verification request was rejected: ${rejectionReason}. Please re-submit clear documents.`
+              : 'Your verification request was rejected. Please re-submit clear ID proof and live selfie.',
+            type: 'provider_status',
+            is_read: false,
+          })
+        } catch (notifErr) {
+          console.error('Non-fatal notification error:', notifErr)
+        }
       }
     }
 
-    return NextResponse.json({ success: true, providerId, status: verificationStatus })
+    return NextResponse.json({ success: true, providerId: targetId, status: verificationStatus })
   } catch (err: any) {
     console.error('Admin provider update error:', err)
     return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 })
