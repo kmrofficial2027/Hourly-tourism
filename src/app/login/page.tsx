@@ -112,6 +112,23 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [rememberMe, setRememberMe] = useState(true)
+  const [savedEmail, setSavedEmail] = useState<string | null>(null)
+
+  // Load saved credentials for easy sign-in
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ht_remembered_email')
+      const savedRole = localStorage.getItem('ht_remembered_role') as PublicRole | null
+      if (saved) {
+        setEmail(saved)
+        setSavedEmail(saved)
+      }
+      if (savedRole && roleConfigs[savedRole] && !initialRoleParam) {
+        setSelectedRole(savedRole)
+      }
+    }
+  }, [initialRoleParam])
 
   // Auto-redirect if user is already authenticated
   useEffect(() => {
@@ -168,27 +185,75 @@ function LoginForm() {
     setError(null)
 
     try {
+      // 1. Strict Role Exclusivity Check before login
+      try {
+        const checkRes = await fetch(
+          `/api/auth/check-email?email=${encodeURIComponent(email)}&role=${selectedRole}`
+        )
+        if (checkRes.ok) {
+          const checkData = await checkRes.json()
+          if (
+            checkData.exists &&
+            checkData.registeredRole &&
+            checkData.registeredRole !== selectedRole &&
+            checkData.registeredRole !== 'admin'
+          ) {
+            if (checkData.registeredRole === 'customer' && selectedRole === 'provider') {
+              throw new Error(
+                'Account already exists in Tourist Portal. Please sign in to the Tourist Portal or create a new account with a different email for Provider.'
+              )
+            }
+            if (checkData.registeredRole === 'customer' && selectedRole === 'company') {
+              throw new Error(
+                'Account already exists in Tourist Portal. Please sign in to the Tourist Portal or create a new account with a different email for Company.'
+              )
+            }
+            if (checkData.registeredRole === 'provider' && selectedRole === 'customer') {
+              throw new Error(
+                'This account is registered as an Independent Provider. Please switch to the Provider Portal tab to sign in.'
+              )
+            }
+            if (checkData.registeredRole === 'company' && selectedRole === 'customer') {
+              throw new Error(
+                'This account is registered as a Company Operator. Please switch to the Company Portal tab to sign in.'
+              )
+            }
+            if (checkData.registeredRole === 'provider' && selectedRole === 'company') {
+              throw new Error(
+                'This account is registered as an Independent Provider. Please switch to the Provider Portal tab to sign in.'
+              )
+            }
+            if (checkData.registeredRole === 'company' && selectedRole === 'provider') {
+              throw new Error(
+                'This account is registered as a Company Operator. Please switch to the Company Portal tab to sign in.'
+              )
+            }
+          }
+        }
+      } catch (checkErr: any) {
+        if (checkErr.message?.includes('already exists') || checkErr.message?.includes('registered as')) {
+          throw checkErr
+        }
+      }
+
+      // 2. Authenticate
       const res = await signIn(email, password)
       if (res?.error) {
         throw new Error(res.error)
       }
 
-      // Synchronize role with server to guarantee appropriate dashboard access
-      let targetPortal = currentRoleConfig.targetUrl
-      try {
-        const syncRes = await fetch('/api/auth/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: selectedRole }),
-        })
-        if (syncRes.ok) {
-          const syncData = await syncRes.json()
-          if (syncData.role === 'admin') targetPortal = '/admin'
-          else if (syncData.role === 'provider') targetPortal = '/provider'
-          else if (syncData.role === 'company') targetPortal = '/company'
-          else if (syncData.role === 'customer') targetPortal = '/dashboard'
+      // 3. Save login details for easy sign-in
+      if (typeof window !== 'undefined') {
+        if (rememberMe) {
+          localStorage.setItem('ht_remembered_email', email.trim())
+          localStorage.setItem('ht_remembered_role', selectedRole)
+          setSavedEmail(email.trim())
+        } else {
+          localStorage.removeItem('ht_remembered_email')
+          localStorage.removeItem('ht_remembered_role')
+          setSavedEmail(null)
         }
-      } catch {}
+      }
 
       showToast.success(`Welcome back! Redirecting to ${currentRoleConfig.badge}...`)
 
@@ -199,7 +264,7 @@ function LoginForm() {
         redirectPath !== '/login' &&
         redirectPath !== '/signup'
           ? redirectPath
-          : targetPortal
+          : currentRoleConfig.targetUrl
 
       window.location.href = target
     } catch (err: any) {
@@ -356,6 +421,30 @@ function LoginForm() {
             </div>
           </div>
 
+          {/* Saved Account Quick Access Banner */}
+          {savedEmail && email === savedEmail && (
+            <div className="mb-4 p-2.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+              <span className="font-semibold truncate">
+                ⚡ Welcome back! Saved account for <strong>{savedEmail}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('ht_remembered_email')
+                    localStorage.removeItem('ht_remembered_role')
+                  }
+                  setSavedEmail(null)
+                  setEmail('')
+                  showToast.success('Saved login details cleared')
+                }}
+                className="text-[10px] text-gray-500 hover:text-red-600 underline ml-2 flex-shrink-0"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           {/* Email / Password Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
@@ -377,6 +466,19 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+
+            {/* Remember me & Easy Sign-in options */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center space-x-2 text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#15803d] border-gray-300 focus:ring-green-500"
+                />
+                <span className="font-medium text-gray-700">Remember me for easy sign-in</span>
+              </label>
+            </div>
 
             {error && (
               <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium leading-relaxed">

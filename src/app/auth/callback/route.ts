@@ -128,7 +128,24 @@ export async function GET(request: Request) {
         const userMeta = data.user.user_metadata || {}
 
         if (!existingProfile) {
-          // New user registration via Google OAuth
+          // Deduplicate: check if an existing profile exists with this email under a different id
+          const { data: duplicateProfile } = await adminSupabase
+            .from('profiles')
+            .select('id, role')
+            .ilike('email', data.user.email || '')
+            .maybeSingle()
+
+          if (duplicateProfile && duplicateProfile.role !== effectiveRole) {
+            await supabase.auth.signOut()
+            const portalName = duplicateProfile.role === 'customer' ? 'Tourist Portal' : `${duplicateProfile.role} Portal`
+            return NextResponse.redirect(
+              `${siteOrigin}/login?role=${effectiveRole}&error=${encodeURIComponent(
+                `Account already exists in ${portalName}. Please sign in to the ${portalName} or create a new account with a different email for ${effectiveRole}.`
+              )}`
+            )
+          }
+
+          // Create exactly one profile for this user
           await adminSupabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
@@ -163,31 +180,36 @@ export async function GET(request: Request) {
             user_metadata: { ...userMeta, role: effectiveRole },
           })
         } else {
-          // Existing user login: determine their real role
-          let realRole = existingProfile.role
-          if (compRow) realRole = 'company'
-          else if (provRow && realRole !== 'company') realRole = 'provider'
+          // Existing user login: STRICT ROLE ISOLATION
+          const realRole = existingProfile.role
 
-          // If the user deliberately selected Provider or Company login tab, ensure they have the role
-          if (effectiveRole === 'provider' && realRole !== 'admin' && realRole !== 'company') {
-            realRole = 'provider'
-            await adminSupabase.from('profiles').update({ role: 'provider' }).eq('id', data.user.id)
-            if (!provRow) {
-              await adminSupabase.from('provider_profiles').insert({
-                user_id: data.user.id,
-                verification_status: 'pending',
-                business_name: userMeta.full_name || 'Independent Host',
-              })
+          // Admin has universal portal clearance
+          if (realRole !== 'admin') {
+            if (realRole === 'customer' && effectiveRole !== 'customer') {
+              await supabase.auth.signOut()
+              return NextResponse.redirect(
+                `${siteOrigin}/login?role=${effectiveRole}&error=${encodeURIComponent(
+                  'Account already exists in Tourist Portal. Please sign in to the Tourist Portal or create a new account with a different email for Provider.'
+                )}`
+              )
             }
-          } else if (effectiveRole === 'company' && realRole !== 'admin') {
-            realRole = 'company'
-            await adminSupabase.from('profiles').update({ role: 'company' }).eq('id', data.user.id)
-            if (!compRow) {
-              await adminSupabase.from('company_profiles').insert({
-                user_id: data.user.id,
-                company_name: userMeta.full_name || 'Company Fleet',
-                verification_status: 'approved',
-              })
+
+            if (realRole === 'provider' && effectiveRole !== 'provider') {
+              await supabase.auth.signOut()
+              return NextResponse.redirect(
+                `${siteOrigin}/login?role=${effectiveRole}&error=${encodeURIComponent(
+                  'This account is registered as a Provider. Please switch to the Provider Portal tab to sign in, or create a separate account.'
+                )}`
+              )
+            }
+
+            if (realRole === 'company' && effectiveRole !== 'company') {
+              await supabase.auth.signOut()
+              return NextResponse.redirect(
+                `${siteOrigin}/login?role=${effectiveRole}&error=${encodeURIComponent(
+                  'This account is registered as a Company Operator. Please switch to the Company Portal tab to sign in, or create a separate account.'
+                )}`
+              )
             }
           }
 

@@ -39,3 +39,4 @@ ALTER TABLE provider_profiles
   DROP CONSTRAINT IF EXISTS provider_profiles_verified_by_fkey,
   ADD CONSTRAINT provider_profiles_verified_by_fkey
     FOREIGN KEY (verified_by) REFERENCES profiles(id) ON DELETE SET NULL;
+

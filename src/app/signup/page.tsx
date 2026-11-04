@@ -112,9 +112,51 @@ function SignUpForm() {
     setError(null)
 
     try {
+      // 1. Deduct duplicates & enforce strict role isolation across portals
+      try {
+        const checkRes = await fetch(
+          `/api/auth/check-email?email=${encodeURIComponent(email)}&role=${role}`
+        )
+        if (checkRes.ok) {
+          const checkData = await checkRes.json()
+          if (checkData.exists) {
+            if (checkData.registeredRole === 'customer' && role !== 'customer') {
+              throw new Error(
+                'Account already exists in Tourist Portal. To register as a Provider or Company, please use a distinct email address, or sign in to your Tourist account.'
+              )
+            }
+            if (checkData.registeredRole === 'provider' && role !== 'provider') {
+              throw new Error(
+                'This email is already registered as an Independent Provider. Please sign in through the Provider Portal or use a different email.'
+              )
+            }
+            if (checkData.registeredRole === 'company' && role !== 'company') {
+              throw new Error(
+                'This email is already registered as a Company Operator. Please sign in through the Company Portal or use a different email.'
+              )
+            }
+            if (checkData.registeredRole === role) {
+              throw new Error(
+                `An account already exists with this email for ${roleLabels[role]?.label || role}. Please sign in to your existing account.`
+              )
+            }
+          }
+        }
+      } catch (checkErr: any) {
+        if (checkErr.message?.includes('already exists') || checkErr.message?.includes('registered as')) {
+          throw checkErr
+        }
+      }
+
       const res = await signUp(email, password, fullName, role)
       if (res?.error) {
         throw new Error(res.error)
+      }
+
+      // Save email for easy sign-in on return
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ht_remembered_email', email.trim())
+        localStorage.setItem('ht_remembered_role', role)
       }
 
       // Synchronize role and create provider/company draft record

@@ -29,8 +29,30 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .maybeSingle()
 
-    // Keep admin role if already admin
-    const finalRole = existingProfile?.role === 'admin' ? 'admin' : targetRole
+    // Strict Role Preservation: If user already has a profile with a role, prevent accidental cross-role overwrite
+    let finalRole = targetRole
+    if (existingProfile?.role) {
+      if (existingProfile.role === 'admin') {
+        finalRole = 'admin'
+      } else if (existingProfile.role === 'customer' && targetRole !== 'customer') {
+        return NextResponse.json(
+          {
+            error:
+              'Account already exists in Tourist Portal. Each portal requires a separate account. Please sign in to the Tourist Portal or register a distinct account for Provider.',
+          },
+          { status: 403 }
+        )
+      } else if (existingProfile.role !== targetRole) {
+        return NextResponse.json(
+          {
+            error: `This account is already registered as ${existingProfile.role}. Please sign in through the appropriate portal.`,
+          },
+          { status: 403 }
+        )
+      } else {
+        finalRole = existingProfile.role
+      }
+    }
 
     // 2. Upsert profile in profiles table
     await adminSupabase.from('profiles').upsert({
