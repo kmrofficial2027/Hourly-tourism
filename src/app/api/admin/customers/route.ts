@@ -105,15 +105,32 @@ export async function DELETE(request: Request) {
 
     const adminSupabase = await createAdminSupabaseClient()
 
-    // 1. Delete user bookings, reviews, notifications
+    // 1. Fetch user bookings to clean up payments, refunds, and earnings
+    const { data: userBookings } = await adminSupabase
+      .from('bookings')
+      .select('id')
+      .eq('customer_id', customerId)
+
+    const bookingIds = (userBookings || []).map((b: any) => b.id)
+
+    if (bookingIds.length > 0) {
+      await adminSupabase.from('refunds').delete().in('booking_id', bookingIds)
+      await adminSupabase.from('payments').delete().in('booking_id', bookingIds)
+      await adminSupabase.from('provider_earnings').delete().in('booking_id', bookingIds)
+      await adminSupabase.from('booking_status_history').delete().in('booking_id', bookingIds)
+      await adminSupabase.from('reviews').delete().in('booking_id', bookingIds)
+      await adminSupabase.from('bookings').delete().in('id', bookingIds)
+    }
+
+    // 2. Delete remaining customer reviews, notifications, support tickets
     await adminSupabase.from('reviews').delete().eq('customer_id', customerId)
     await adminSupabase.from('notifications').delete().eq('user_id', customerId)
-    await adminSupabase.from('bookings').delete().eq('customer_id', customerId)
+    await adminSupabase.from('support_tickets').delete().eq('user_id', customerId)
 
-    // 2. Delete profile
+    // 3. Delete profile
     await adminSupabase.from('profiles').delete().eq('id', customerId)
 
-    // 3. Delete from Supabase Auth
+    // 4. Delete from Supabase Auth
     const { error: authErr } = await adminSupabase.auth.admin.deleteUser(customerId)
     if (authErr && !authErr.message.includes('not found')) {
       console.warn('Auth delete note:', authErr.message)

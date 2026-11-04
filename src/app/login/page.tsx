@@ -133,23 +133,26 @@ function LoginForm() {
   // Auto-redirect if user is already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      // Prioritize profile role to ensure providers/companies reach their dedicated portals
-      const role = profile?.role || (user.user_metadata?.role as string)
-      if (!role && profile === undefined) return // Wait for profile fetch if still pending
+      // Wait until profile is fetched from database to ensure exact role routing
+      if (!profile) return
 
-      const effectiveRole = role || selectedRole || 'customer'
+      const effectiveRole = profile.role || (user.user_metadata?.role as string) || selectedRole || 'customer'
       let dest = '/dashboard'
       if (effectiveRole === 'admin') dest = '/admin'
       else if (effectiveRole === 'provider') dest = '/provider'
       else if (effectiveRole === 'company') dest = '/company'
 
-      const target =
+      let target = dest
+      if (
         redirectPath &&
         redirectPath.startsWith('/') &&
-        redirectPath !== '/login' &&
-        redirectPath !== '/signup'
-          ? redirectPath
-          : dest
+        !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
+      ) {
+        if (effectiveRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
+        else if (effectiveRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
+        else if (effectiveRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
+        else if (effectiveRole === 'admin') target = redirectPath
+      }
 
       window.location.href = target
     }
@@ -251,14 +254,17 @@ function LoginForm() {
 
       showToast.success(`Welcome back! Redirecting to ${currentRoleConfig.badge}...`)
 
-      // If user came with a specific redirect, use it; otherwise use the role portal
-      const target =
+      // Calculate role-safe portal destination
+      let target = currentRoleConfig.targetUrl
+      if (
         redirectPath &&
         redirectPath.startsWith('/') &&
-        redirectPath !== '/login' &&
-        redirectPath !== '/signup'
-          ? redirectPath
-          : currentRoleConfig.targetUrl
+        !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
+      ) {
+        if (selectedRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
+        else if (selectedRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
+        else if (selectedRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
+      }
 
       window.location.href = target
     } catch (err: any) {
@@ -275,7 +281,16 @@ function LoginForm() {
     setError(null)
 
     try {
-      const target = redirectPath || currentRoleConfig.targetUrl
+      let target = currentRoleConfig.targetUrl
+      if (
+        redirectPath &&
+        redirectPath.startsWith('/') &&
+        !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
+      ) {
+        if (selectedRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
+        else if (selectedRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
+        else if (selectedRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
+      }
       const res = await signInWithGoogle(selectedRole, target)
       if (res?.error) {
         // If Google provider not yet activated in Supabase dashboard

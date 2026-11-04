@@ -17,6 +17,7 @@ import {
   Mail,
   MapPin,
   ExternalLink,
+  Trash2,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
@@ -92,6 +93,32 @@ export default function AdminProvidersPage() {
       setRejectionReason('')
     } catch (err: any) {
       showToast.error(err.message || 'Action failed')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDeleteProvider = async (provider: any) => {
+    if (!window.confirm(`Are you sure you want to permanently delete provider ${provider.business_name || provider.owner_name || provider.email}? All associated listings, vehicles, and fleet bookings will be permanently removed.`)) {
+      return
+    }
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/admin/providers?id=${provider.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setProviders((prev) => prev.filter((p) => p.id !== provider.id))
+        if (selectedProvider?.id === provider.id) {
+          setSelectedProvider(null)
+        }
+        showToast.success('Provider and all associated fleet listings removed successfully')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast.error(data.error || 'Failed to delete provider')
+      }
+    } catch {
+      showToast.error('Network error deleting provider')
     } finally {
       setActionLoading(false)
     }
@@ -299,6 +326,14 @@ export default function AdminProvidersPage() {
                                 <Check className="w-3.5 h-3.5" />
                               </Button>
                             )}
+
+                            <button
+                              onClick={() => handleDeleteProvider(p)}
+                              title="Delete Provider Account"
+                              className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -445,44 +480,55 @@ export default function AdminProvidersPage() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
                 <Button
-                  variant="secondary"
+                  variant="danger"
                   size="md"
-                  onClick={() => setSelectedProvider(null)}
+                  onClick={() => handleDeleteProvider(selectedProvider)}
                 >
-                  Close
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Delete Account
                 </Button>
 
-                {!showRejectInput ? (
+                <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    variant="danger"
+                    variant="secondary"
                     size="md"
-                    onClick={() => setShowRejectInput(true)}
+                    onClick={() => setSelectedProvider(null)}
                   >
-                    <X className="w-4 h-4 mr-1.5" />
-                    Reject Application
+                    Close
                   </Button>
-                ) : (
+
+                  {!showRejectInput ? (
+                    <Button
+                      variant="danger"
+                      size="md"
+                      onClick={() => setShowRejectInput(true)}
+                    >
+                      <X className="w-4 h-4 mr-1.5" />
+                      Reject Application
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      size="md"
+                      isLoading={actionLoading}
+                      onClick={() => handleAction(selectedProvider.id, 'rejected')}
+                    >
+                      Confirm Rejection
+                    </Button>
+                  )}
+
                   <Button
-                    variant="danger"
+                    variant="primary"
                     size="md"
                     isLoading={actionLoading}
-                    onClick={() => handleAction(selectedProvider.id, 'rejected')}
+                    onClick={() => handleAction(selectedProvider.id, 'approved')}
                   >
-                    Confirm Rejection
+                    <Check className="w-4 h-4 mr-1.5" />
+                    Approve & Activate Host
                   </Button>
-                )}
-
-                <Button
-                  variant="primary"
-                  size="md"
-                  isLoading={actionLoading}
-                  onClick={() => handleAction(selectedProvider.id, 'approved')}
-                >
-                  <Check className="w-4 h-4 mr-1.5" />
-                  Approve & Activate Host
-                </Button>
+                </div>
               </div>
             </div>
           </Modal>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 // GET: Check if an email is already registered, and verify role compatibility
 export async function GET(request: Request) {
   try {

@@ -9,9 +9,11 @@ function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [statusMessage, setStatusMessage] = useState('Verifying credentials...')
+  const hasExecutedRef = React.useRef(false)
 
   useEffect(() => {
-    let isCancelled = false
+    if (hasExecutedRef.current) return
+    hasExecutedRef.current = true
 
     async function handleAuthCallback() {
       const code = searchParams.get('code')
@@ -47,15 +49,30 @@ function AuthCallbackContent() {
 
       try {
         const supabase = createClient()
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
-        if (exchangeError) {
-          console.error('Client exchangeCodeForSession error:', exchangeError)
-          window.location.replace(`/login?error=${encodeURIComponent(exchangeError.message)}`)
-          return
+        // 1. Check if a session is already established
+        const { data: initialSession } = await supabase.auth.getSession()
+        let authUser = initialSession?.session?.user
+
+        if (!authUser) {
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+          if (exchangeError) {
+            // Check if concurrent background exchange succeeded
+            const { data: retrySession } = await supabase.auth.getSession()
+            if (retrySession?.session?.user) {
+              authUser = retrySession.session.user
+            } else {
+              console.error('Client exchangeCodeForSession error:', exchangeError)
+              window.location.replace(`/login?error=${encodeURIComponent(exchangeError.message)}`)
+              return
+            }
+          } else {
+            authUser = data?.user || null
+          }
         }
 
-        if (!data?.user) {
+        if (!authUser) {
           window.location.replace('/login?error=session_not_created')
           return
         }
@@ -73,7 +90,7 @@ function AuthCallbackContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             role: effectiveRole,
-            fullName: data.user.user_metadata?.full_name || data.user.user_metadata?.name,
+            fullName: authUser.user_metadata?.full_name || authUser.user_metadata?.name,
           }),
         })
 
@@ -93,15 +110,21 @@ function AuthCallbackContent() {
         else if (resolvedRole === 'provider') target = '/provider'
         else if (resolvedRole === 'company') target = '/company'
 
+        // Only apply storedRedirect if it's a specific route matching the user's portal
         if (
           storedRedirect &&
           storedRedirect.startsWith('/') &&
-          storedRedirect !== '/login' &&
-          storedRedirect !== '/signup' &&
-          storedRedirect !== '/null' &&
-          storedRedirect !== '/undefined'
+          !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(storedRedirect)
         ) {
-          target = storedRedirect
+          if (resolvedRole === 'provider' && storedRedirect.startsWith('/provider')) {
+            target = storedRedirect
+          } else if (resolvedRole === 'company' && storedRedirect.startsWith('/company')) {
+            target = storedRedirect
+          } else if (resolvedRole === 'customer' && storedRedirect.startsWith('/dashboard')) {
+            target = storedRedirect
+          } else if (resolvedRole === 'admin') {
+            target = storedRedirect
+          }
         }
 
         setStatusMessage('Redirecting to your dashboard...')
@@ -113,10 +136,6 @@ function AuthCallbackContent() {
     }
 
     handleAuthCallback()
-
-    return () => {
-      isCancelled = true
-    }
   }, [searchParams])
 
   return (

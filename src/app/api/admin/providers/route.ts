@@ -179,24 +179,46 @@ export async function DELETE(request: Request) {
       if (listings && listings.length > 0) {
         const listingIds = listings.map((l: any) => l.id)
 
+        // Find all bookings for these listings
+        const { data: provBookings } = await adminSupabase
+          .from('bookings')
+          .select('id')
+          .in('listing_id', listingIds)
+
+        const bookingIds = (provBookings || []).map((b: any) => b.id)
+
+        if (bookingIds.length > 0) {
+          await adminSupabase.from('refunds').delete().in('booking_id', bookingIds)
+          await adminSupabase.from('payments').delete().in('booking_id', bookingIds)
+          await adminSupabase.from('provider_earnings').delete().in('booking_id', bookingIds)
+          await adminSupabase.from('booking_status_history').delete().in('booking_id', bookingIds)
+          await adminSupabase.from('reviews').delete().in('booking_id', bookingIds)
+          await adminSupabase.from('bookings').delete().in('id', bookingIds)
+        }
+
         // Delete child tables of listings
         for (const lId of listingIds) {
           await adminSupabase.from('vehicle_details').delete().eq('listing_id', lId)
           await adminSupabase.from('guide_details').delete().eq('listing_id', lId)
           await adminSupabase.from('hourly_packages').delete().eq('listing_id', lId)
-          await adminSupabase.from('bookings').delete().eq('listing_id', lId)
+          await adminSupabase.from('provider_availability').delete().eq('listing_id', lId)
+          await adminSupabase.from('availability_exceptions').delete().eq('listing_id', lId)
         }
 
         // Delete listings themselves
         await adminSupabase.from('service_listings').delete().eq('provider_id', prov.id)
       }
 
+      // Delete any direct earnings for this provider
+      await adminSupabase.from('provider_earnings').delete().eq('provider_id', prov.id)
+
       // 3. Delete provider profile
       await adminSupabase.from('provider_profiles').delete().eq('id', prov.id)
     }
 
-    // 4. Delete notifications & profile
+    // 4. Delete notifications, support tickets & profile
     await adminSupabase.from('notifications').delete().eq('user_id', userId)
+    await adminSupabase.from('support_tickets').delete().eq('user_id', userId)
     await adminSupabase.from('profiles').delete().eq('id', userId)
 
     // 5. Delete from Supabase Auth

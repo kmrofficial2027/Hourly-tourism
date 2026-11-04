@@ -21,9 +21,22 @@ import { useAuth } from '@/hooks/useAuth'
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils'
 
 export default function CustomerDashboardPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Redirect providers/companies to their dedicated portals
+  useEffect(() => {
+    if (!authLoading && profile?.role) {
+      if (profile.role === 'provider') {
+        window.location.replace('/provider')
+      } else if (profile.role === 'company') {
+        window.location.replace('/company')
+      } else if (profile.role === 'admin') {
+        window.location.replace('/admin')
+      }
+    }
+  }, [profile, authLoading])
 
   useEffect(() => {
     async function loadBookings() {

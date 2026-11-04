@@ -69,7 +69,8 @@ function SignUpForm() {
   // Auto-redirect if user is already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      let userRole = profile?.role || (user.user_metadata?.role as string) || 'customer'
+      if (!profile) return
+      const userRole = profile.role || (user.user_metadata?.role as string) || 'customer'
       let target = '/dashboard'
       if (userRole === 'admin') target = '/admin'
       else if (userRole === 'provider') target = '/provider'
@@ -85,18 +86,8 @@ function SignUpForm() {
         setError('Google sign-up was cancelled or could not be completed.')
       } else if (errorParam === 'missing_code') {
         setError('Google sign-up did not return an authorization code. Please try again.')
-      } else if (
-        errorParam.includes('PKCE') ||
-        errorParam.includes('code challenge') ||
-        errorParam.includes('verifier') ||
-        errorParam.includes('flow_state')
-      ) {
-        setError('Previous sign-up session expired or was interrupted. Please click "Continue with Google" again or sign up with your email below.')
-        if (typeof window !== 'undefined') {
-          window.history.replaceState({}, '', window.location.pathname)
-        }
       } else {
-        setError(`Google Sign-Up: ${decodeURIComponent(errorParam)}`)
+        setError(decodeURIComponent(errorParam))
       }
     }
   }, [searchParams])
@@ -195,7 +186,7 @@ function SignUpForm() {
     try {
       const target =
         role === 'provider'
-          ? '/become-provider'
+          ? '/provider'
           : role === 'company'
           ? '/company'
           : '/dashboard'

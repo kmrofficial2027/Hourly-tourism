@@ -21,6 +21,7 @@ import {
   TrendingUp,
   UserCheck,
   UserX,
+  Trash2,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
@@ -99,6 +100,29 @@ export default function AdminCustomersPage() {
       }
     } catch (err) {
       showToast.error('Could not update customer status')
+    }
+  }
+
+  const handleDeleteCustomer = async (customer: any) => {
+    if (!window.confirm(`Are you sure you want to permanently delete customer ${customer.full_name || customer.email}? All associated bookings and records will be removed.`)) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/admin/customers?id=${customer.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setCustomers((prev) => prev.filter((c) => c.id !== customer.id))
+        if (selectedCustomer?.id === customer.id) {
+          setSelectedCustomer(null)
+        }
+        showToast.success('Customer account deleted successfully')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast.error(data.error || 'Failed to delete customer')
+      }
+    } catch {
+      showToast.error('Network error deleting customer')
     }
   }
 
@@ -385,6 +409,14 @@ export default function AdminCustomersPage() {
                               <UserCheck className="w-3.5 h-3.5" />
                             )}
                           </button>
+
+                          <button
+                            onClick={() => handleDeleteCustomer(customer)}
+                            title="Delete Customer Account"
+                            className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -488,7 +520,15 @@ export default function AdminCustomersPage() {
                   Close
                 </Button>
                 <Button
-                  variant={selectedCustomer.status === 'active' ? 'danger' : 'primary'}
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDeleteCustomer(selectedCustomer)}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  Delete Account
+                </Button>
+                <Button
+                  variant={selectedCustomer.status === 'active' ? 'secondary' : 'primary'}
                   size="sm"
                   onClick={() => handleToggleStatus(selectedCustomer)}
                 >

@@ -233,7 +233,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
-    const redirectTo = `${origin}/auth/callback`
+    const roleParam = encodeURIComponent(role)
+    const redirParam = encodeURIComponent(redirectPath || '')
+    const redirectTo = `${origin}/auth/callback?role=${roleParam}&redirect=${redirParam}`
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({

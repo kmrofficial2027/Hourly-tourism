@@ -58,7 +58,6 @@ export async function updateSession(request: NextRequest) {
       url,
       anonKey,
       {
-        cookieEncoding: 'raw',
         cookies: {
           getAll() {
             return request.cookies.getAll()
@@ -89,108 +88,64 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // 2. If already logged in and visits /login or /signup, auto-redirect to their appropriate dashboard
+    // 2. Resolve database role for authenticated user
+    let userRole = (user?.user_metadata?.role as string) || (user?.app_metadata?.role as string)
+    if (user) {
+      try {
+        const res = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        })
+        const profData = await res.json()
+        if (profData?.[0]?.role) {
+          userRole = profData[0].role
+        }
+      } catch { }
+    }
+
+    // 2. If already logged in and visits /login or /signup, auto-redirect to their exact dashboard
     if (user && (isLoginPage || isSignupPage) && request.nextUrl.pathname !== '/admin/login') {
-      let role = (user.user_metadata?.role as string) || (user.app_metadata?.role as string)
-
-      if (!role) {
-        try {
-          const res = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-          })
-          const profData = await res.json()
-          role = profData?.[0]?.role
-        } catch { }
-      }
-
       let dest = '/dashboard'
-      if (role === 'admin') dest = '/admin'
-      else if (role === 'provider') dest = '/provider'
-      else if (role === 'company') dest = '/company'
+      if (userRole === 'admin') dest = '/admin'
+      else if (userRole === 'provider') dest = '/provider'
+      else if (userRole === 'company') dest = '/company'
 
       return NextResponse.redirect(new URL(dest, request.url))
     }
 
-    // 3. Role-based portal protection for authenticated users
+    // 3. Role-based portal protection and auto-routing for authenticated users
     if (user) {
-      let role = (user.user_metadata?.role as string) || (user.app_metadata?.role as string)
-
+      const isDashboardPath = request.nextUrl.pathname.startsWith('/dashboard')
       const isProviderPath = request.nextUrl.pathname.startsWith('/provider')
       const isCompanyPath = request.nextUrl.pathname.startsWith('/company')
       const isAdminPath = request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin/login'
 
-      // Provider route access check
-      if (isProviderPath && !['provider', 'admin'].includes(role || '')) {
-        let hasAccess = false
-        try {
-          // Check provider_profiles table
-          const provRes = await fetch(`${url}/rest/v1/provider_profiles?user_id=eq.${user.id}&select=id`, {
-            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-          })
-          const provData = await provRes.json()
-          if (Array.isArray(provData) && provData.length > 0) {
-            hasAccess = true
-          } else {
-            // Check profiles table role
-            const profRes = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-              headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-            })
-            const profData = await profRes.json()
-            if (['provider', 'admin'].includes(profData?.[0]?.role)) {
-              hasAccess = true
-            }
-          }
-        } catch { }
-
-        if (!hasAccess) {
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
+      // 3.1. Providers visiting customer portal (/dashboard) -> redirect to Provider Portal
+      if (isDashboardPath && userRole === 'provider') {
+        return NextResponse.redirect(new URL('/provider', request.url))
       }
 
-      // Company route access check
-      if (isCompanyPath && !['company', 'admin'].includes(role || '')) {
-        let hasAccess = false
-        try {
-          // Check company_profiles table
-          const compRes = await fetch(`${url}/rest/v1/company_profiles?user_id=eq.${user.id}&select=id`, {
-            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-          })
-          const compData = await compRes.json()
-          if (Array.isArray(compData) && compData.length > 0) {
-            hasAccess = true
-          } else {
-            // Check profiles table role
-            const profRes = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-              headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-            })
-            const profData = await profRes.json()
-            if (['company', 'admin'].includes(profData?.[0]?.role)) {
-              hasAccess = true
-            }
-          }
-        } catch { }
-
-        if (!hasAccess) {
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
+      // 3.2. Companies visiting customer portal (/dashboard) -> redirect to Company Portal
+      if (isDashboardPath && userRole === 'company') {
+        return NextResponse.redirect(new URL('/company', request.url))
       }
 
-      // Admin route access check
-      if (isAdminPath && role !== 'admin') {
-        let isAdmin = false
-        try {
-          const profRes = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-          })
-          const profData = await profRes.json()
-          if (profData?.[0]?.role === 'admin') {
-            isAdmin = true
-          }
-        } catch { }
+      // 3.3. Customers visiting Provider portal -> redirect to Customer Dashboard
+      if (isProviderPath && userRole === 'customer') {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
 
-        if (!isAdmin) {
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
+      // 3.4. Customers or Providers visiting Company portal -> redirect to their own portal
+      if (isCompanyPath && userRole !== 'company' && userRole !== 'admin') {
+        const target = userRole === 'provider' ? '/provider' : '/dashboard'
+        return NextResponse.redirect(new URL(target, request.url))
+      }
+
+      // 3.5. Non-admins visiting Admin portal -> redirect to their own portal
+      if (isAdminPath && userRole !== 'admin') {
+        let dest = '/dashboard'
+        if (userRole === 'provider') dest = '/provider'
+        else if (userRole === 'company') dest = '/company'
+        return NextResponse.redirect(new URL(dest, request.url))
       }
     }
   } catch (e) {

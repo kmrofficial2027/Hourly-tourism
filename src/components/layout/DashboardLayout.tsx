@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -42,6 +42,19 @@ export function DashboardLayout({
   const router = useRouter()
   const { user, profile, signOut, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Enforce role-specific portal boundaries on client side
+  useEffect(() => {
+    if (!loading && profile?.role) {
+      if (profile.role === 'provider' && role === 'customer') {
+        window.location.replace('/provider')
+      } else if (profile.role === 'company' && role === 'customer') {
+        window.location.replace('/company')
+      } else if (profile.role === 'customer' && (role === 'provider' || role === 'company')) {
+        window.location.replace('/dashboard')
+      }
+    }
+  }, [profile, role, loading])
 
   // Navigation configurations per role
   const navConfigs = {
