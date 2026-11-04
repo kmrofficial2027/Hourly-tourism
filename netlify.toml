@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NEXT_PUBLIC_SUPABASE_URL = "https://isdtxdmwzkkjoxmizgje.supabase.co"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZHR4ZG13emtram94bWl6Z2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3MDk5MjksImV4cCI6MjEwOTI4NTkyOX0.YeeoFi4fxJhrkYgaOkEYIldDryz_-FMFuqaulQKPHrU"
+  NEXT_PUBLIC_APP_URL = "https://hourlytourism.netlify.app"
+  NEXT_PUBLIC_APP_NAME = "Hourly Tourism"
+  NEXT_PUBLIC_MAPS_API_KEY = "AIzaSyCfLEm0cwzlOOixtKZUOmfCwqrfv6kwl3k"
+  NEXT_PUBLIC_MAPS_PROVIDER = "google"
