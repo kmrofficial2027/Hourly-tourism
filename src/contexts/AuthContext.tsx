@@ -220,14 +220,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
 
-    const rawOrigin = typeof window !== 'undefined' ? window.location.origin : ''
-    const origin = rawOrigin.includes('hourlytourism.netlify.app')
-      ? 'https://hourlytourism.netlify.app'
-      : (rawOrigin || process.env.NEXT_PUBLIC_APP_URL || 'https://hourlytourism.netlify.app')
+    // Store role and redirect destination in cookies and localStorage for the OAuth callback
+    if (typeof document !== 'undefined') {
+      document.cookie = `ht_auth_role=${encodeURIComponent(role)}; path=/; max-age=600; SameSite=Lax`
+      document.cookie = `ht_auth_redirect=${encodeURIComponent(redirectPath || '')}; path=/; max-age=600; SameSite=Lax`
+      try {
+        localStorage.setItem('ht_auth_role', role)
+        localStorage.setItem('ht_auth_redirect', redirectPath || '')
+      } catch {}
+    }
 
-    const redirectTo = `${origin}/auth/callback?redirect=${encodeURIComponent(
-      redirectPath || ''
-    )}&role=${role}`
+    // Clean canonical redirect URL with zero query parameters to prevent Supabase allowlist mismatch
+    const redirectTo = 'https://hourlytourism.netlify.app/auth/callback'
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({

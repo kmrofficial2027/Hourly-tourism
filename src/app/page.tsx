@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import {
   Compass,
   Clock,
@@ -134,7 +135,15 @@ const initialFeaturedServices = [
   },
 ]
 
-export default function HomePage() {
+export default function HomePage({
+  searchParams,
+}: {
+  searchParams?: { code?: string }
+}) {
+  if (searchParams?.code) {
+    redirect(`https://hourlytourism.netlify.app/auth/callback?code=${searchParams.code}`)
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header />

@@ -12,20 +12,8 @@ export async function GET(request: Request) {
   const oauthError = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Determine site canonical origin safely
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const hostHeader = request.headers.get('host') || ''
-
-  let siteOrigin = 'https://hourlytourism.netlify.app'
-  if (process.env.NODE_ENV === 'development' || hostHeader.includes('localhost')) {
-    siteOrigin = 'http://localhost:3000'
-  } else if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')) {
-    siteOrigin = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
-  } else if (forwardedHost && !forwardedHost.includes('master--')) {
-    siteOrigin = `https://${forwardedHost}`
-  } else if (hostHeader && !hostHeader.includes('master--')) {
-    siteOrigin = `https://${hostHeader}`
-  }
+  // Always redirect to the canonical Netlify production domain
+  const siteOrigin = 'https://hourlytourism.netlify.app'
 
   // Handle incoming OAuth errors directly from Google/Supabase
   if (oauthError || errorDescription) {
@@ -47,27 +35,37 @@ export async function GET(request: Request) {
   const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const anonKey = envKey && !envKey.includes('placeholder') ? envKey : DEFAULT_SUPABASE_ANON_KEY
 
+  const cookieStore = await cookies()
+  const cookieRole = cookieStore.get('ht_auth_role')?.value
+  const cookieRedirect = cookieStore.get('ht_auth_redirect')?.value
+
+  const effectiveRole = searchParams.get('role') || cookieRole || role || 'customer'
+  const rawRedirect = searchParams.get('redirect') || cookieRedirect || redirectParam
+
   // Prepare destination
   let targetPath = '/dashboard'
-  if (role === 'admin') targetPath = '/admin'
-  else if (role === 'provider') targetPath = '/provider'
-  else if (role === 'company') targetPath = '/company'
+  if (effectiveRole === 'admin') targetPath = '/admin'
+  else if (effectiveRole === 'provider') targetPath = '/provider'
+  else if (effectiveRole === 'company') targetPath = '/company'
 
   if (
-    redirectParam &&
-    redirectParam.startsWith('/') &&
-    redirectParam !== '/login' &&
-    redirectParam !== '/null' &&
-    redirectParam !== '/undefined'
+    rawRedirect &&
+    rawRedirect.startsWith('/') &&
+    rawRedirect !== '/login' &&
+    rawRedirect !== '/null' &&
+    rawRedirect !== '/undefined'
   ) {
-    targetPath = redirectParam
+    targetPath = rawRedirect
   }
 
   // Create redirect response upfront so cookies can be attached to it
   const response = NextResponse.redirect(`${siteOrigin}${targetPath}`)
 
+  // Clean temporary auth cookies
+  response.cookies.delete('ht_auth_role')
+  response.cookies.delete('ht_auth_redirect')
+
   try {
-    const cookieStore = await cookies()
     const supabase = createServerClient(url, anonKey, {
       cookies: {
         getAll() {
@@ -116,14 +114,14 @@ export async function GET(request: Request) {
               data.user.email?.split('@')[0] ||
               'User',
             avatar_url: userMeta.avatar_url || userMeta.picture || '',
-            role: role,
+            role: effectiveRole,
             is_active: true,
             email_verified: true,
             phone_verified: false,
           })
         } else if (existingProfile.role) {
           // Adjust destination based on actual database role if no specific deep link was requested
-          if (!redirectParam || redirectParam === '/') {
+          if (!rawRedirect || rawRedirect === '/') {
             if (existingProfile.role === 'admin') targetPath = '/admin'
             else if (existingProfile.role === 'provider') targetPath = '/provider'
             else if (existingProfile.role === 'company') targetPath = '/company'

@@ -12,3 +12,4 @@
   NEXT_PUBLIC_APP_NAME = "Hourly Tourism"
   NEXT_PUBLIC_MAPS_API_KEY = "AIzaSyCfLEm0cwzlOOixtKZUOmfCwqrfv6kwl3k"
   NEXT_PUBLIC_MAPS_PROVIDER = "google"
+
