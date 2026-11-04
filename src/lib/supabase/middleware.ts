@@ -32,6 +32,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(callbackUrl)
   }
 
+  // 3. Let /auth/callback handle token exchange cleanly without middleware interception
+  if (request.nextUrl.pathname === '/auth/callback') {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -53,6 +58,7 @@ export async function updateSession(request: NextRequest) {
       url,
       anonKey,
       {
+        cookieEncoding: 'raw',
         cookies: {
           getAll() {
             return request.cookies.getAll()

@@ -21,6 +21,7 @@ export async function createServerSupabaseClient() {
     url,
     anonKey,
     {
+      cookieEncoding: 'raw',
       cookies: {
         getAll() {
           return cookieStore.getAll()
