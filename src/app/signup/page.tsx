@@ -54,7 +54,7 @@ function SignUpForm() {
   const { user, profile, signUp, signInWithGoogle, loading: authLoading } = useAuth()
 
   const [role, setRole] = useState<UserRole>(
-    initialRoleParam && ['customer', 'provider', 'company'].includes(initialRoleParam)
+    initialRoleParam && ['customer', 'provider'].includes(initialRoleParam)
       ? initialRoleParam
       : 'customer'
   )
@@ -74,7 +74,6 @@ function SignUpForm() {
       let target = '/dashboard'
       if (userRole === 'admin') target = '/admin'
       else if (userRole === 'provider') target = '/provider'
-      else if (userRole === 'company') target = '/company'
       window.location.href = target
     }
   }, [user, profile, authLoading])
@@ -113,17 +112,12 @@ function SignUpForm() {
           if (checkData.exists) {
             if (checkData.registeredRole === 'customer' && role !== 'customer') {
               throw new Error(
-                'Account already exists in Tourist Portal. To register as a Provider or Company, please use a distinct email address, or sign in to your Tourist account.'
+                'Account already exists in Tourist Portal. To register as a Provider, please use a distinct email address, or sign in to your Tourist account.'
               )
             }
             if (checkData.registeredRole === 'provider' && role !== 'provider') {
               throw new Error(
                 'This email is already registered as an Independent Provider. Please sign in through the Provider Portal or use a different email.'
-              )
-            }
-            if (checkData.registeredRole === 'company' && role !== 'company') {
-              throw new Error(
-                'This email is already registered as a Company Operator. Please sign in through the Company Portal or use a different email.'
               )
             }
             if (checkData.registeredRole === role) {
@@ -150,7 +144,7 @@ function SignUpForm() {
         localStorage.setItem('ht_remembered_role', role)
       }
 
-      // Synchronize role and create provider/company draft record
+      // Synchronize role and create provider draft record
       try {
         await fetch('/api/auth/sync', {
           method: 'POST',
@@ -163,8 +157,6 @@ function SignUpForm() {
       let target = '/dashboard'
       if (role === 'provider') {
         target = '/provider'
-      } else if (role === 'company') {
-        target = '/company'
       } else if (role === 'admin') {
         target = '/admin'
       }
@@ -184,12 +176,7 @@ function SignUpForm() {
     setError(null)
 
     try {
-      const target =
-        role === 'provider'
-          ? '/provider'
-          : role === 'company'
-          ? '/company'
-          : '/dashboard'
+      const target = role === 'provider' ? '/provider' : '/dashboard'
       const res = await signInWithGoogle(role, target)
       if (res?.error) {
         if (
@@ -221,10 +208,6 @@ function SignUpForm() {
       label: 'Independent Host / Provider',
       desc: 'List your hourly vehicle or guide services and earn flexible income.',
     },
-    company: {
-      label: 'Tourism Fleet / Operator',
-      desc: 'Manage commercial multi-vehicle fleet and operator staff.',
-    },
   }
 
   return (
@@ -251,41 +234,29 @@ function SignUpForm() {
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
               Select Account Type:
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setRole('customer')}
-                className={`py-2.5 px-2 rounded-2xl text-xs font-bold transition-all border flex flex-col items-center space-y-1 ${
+                className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all border flex items-center justify-center space-x-1.5 ${
                   role === 'customer'
                     ? 'border-[#0a4d29] bg-green-50/80 text-[#0a4d29] shadow-sm ring-1 ring-green-600/20'
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>🧳 Tourist</span>
+                <span>🧳 Tourist Portal</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setRole('provider')}
-                className={`py-2.5 px-2 rounded-2xl text-xs font-bold transition-all border flex flex-col items-center space-y-1 ${
+                className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all border flex items-center justify-center space-x-1.5 ${
                   role === 'provider'
                     ? 'border-[#ff7a00] bg-orange-50/80 text-[#ff7a00] shadow-sm ring-1 ring-orange-500/20'
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>🏍️ Provider</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('company')}
-                className={`py-2.5 px-2 rounded-2xl text-xs font-bold transition-all border flex flex-col items-center space-y-1 ${
-                  role === 'company'
-                    ? 'border-blue-600 bg-blue-50/80 text-blue-800 shadow-sm ring-1 ring-blue-500/20'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span>🏢 Operator</span>
+                <span>🏍️ Provider Portal</span>
               </button>
             </div>
 

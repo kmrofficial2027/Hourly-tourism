@@ -84,6 +84,29 @@ export async function POST(request: Request) {
       businessName,
       city,
       phone,
+
+      // Driver Verification Details
+      driverName,
+      driverPhone,
+      dlNumber,
+      dlExpiry,
+      dlFront,
+      dlBack,
+      driverExperience,
+
+      // Vehicle Verification Details
+      vehicleType,
+      vehicleBrand,
+      vehicleModel,
+      vehicleYear,
+      vehicleRegNumber,
+      vehicleCapacity,
+      fuelType,
+      rcDocument,
+      insuranceDocument,
+      insuranceExpiry,
+      fitnessDocument,
+      vehiclePhoto,
     } = body
 
     if (!idType || !idNumber || !idCardFront || !livePhoto) {
@@ -96,11 +119,36 @@ export async function POST(request: Request) {
     const adminSupabase = await createAdminSupabaseClient()
 
     const documentPayload = {
+      // 1. Identity & KYC Proof
       id_type: idType,
       id_number: idNumber,
       id_card_front: idCardFront,
       id_card_back: idCardBack || null,
       live_photo: livePhoto,
+
+      // 2. Driver Details & Driving Licence
+      driver_name: driverName || null,
+      driver_phone: driverPhone || null,
+      dl_number: dlNumber || null,
+      dl_expiry: dlExpiry || null,
+      dl_front: dlFront || null,
+      dl_back: dlBack || null,
+      driver_experience: driverExperience || null,
+
+      // 3. Vehicle Details & Registration Compliance
+      vehicle_type: vehicleType || 'car',
+      vehicle_brand: vehicleBrand || null,
+      vehicle_model: vehicleModel || null,
+      vehicle_year: vehicleYear || null,
+      registration_number: vehicleRegNumber || null,
+      seating_capacity: vehicleCapacity || null,
+      fuel_type: fuelType || null,
+      rc_document: rcDocument || null,
+      insurance_document: insuranceDocument || null,
+      insurance_expiry: insuranceExpiry || null,
+      fitness_document: fitnessDocument || null,
+      vehicle_photo: vehiclePhoto || null,
+
       submitted_at: new Date().toISOString(),
     }
 

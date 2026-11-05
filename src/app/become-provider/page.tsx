@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   ArrowRight,
   UploadCloud,
-  Building2,
   User,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
@@ -28,7 +27,6 @@ export default function BecomeProviderPage() {
   const router = useRouter()
   const { user } = useAuth()
 
-  const [providerType, setProviderType] = useState<'individual' | 'company'>('individual')
   const [businessName, setBusinessName] = useState('')
   const [serviceCategory, setServiceCategory] = useState('bike')
   const [city, setCity] = useState('')
@@ -52,7 +50,7 @@ export default function BecomeProviderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerType,
+          providerType: 'individual',
           businessName,
           serviceCategory,
           city,
@@ -70,7 +68,7 @@ export default function BecomeProviderPage() {
       setSuccess(true)
       showToast.success('Provider onboarding submitted! Redirecting to provider portal...')
       setTimeout(() => {
-        window.location.href = providerType === 'company' ? '/company' : '/provider'
+        window.location.href = '/provider'
       }, 1200)
     } catch (err: any) {
       showToast.error(err.message || 'Error submitting application')
@@ -141,45 +139,12 @@ export default function BecomeProviderPage() {
                 <Logo variant="compact" />
               </div>
 
-              {/* Account Type Toggle */}
-              <div className="grid grid-cols-2 gap-4">
-                <div
-                  onClick={() => setProviderType('individual')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center space-x-3 ${
-                    providerType === 'individual'
-                      ? 'border-[#ff7a00] bg-orange-50/50'
-                      : 'border-gray-200 hover:border-orange-300'
-                  }`}
-                >
-                  <User className="w-6 h-6 text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">Independent Provider</p>
-                    <p className="text-[11px] text-gray-500">Individual bike/car owner or guide</p>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setProviderType('company')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center space-x-3 ${
-                    providerType === 'company'
-                      ? 'border-[#ff7a00] bg-orange-50/50'
-                      : 'border-gray-200 hover:border-orange-300'
-                  }`}
-                >
-                  <Building2 className="w-6 h-6 text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">Tourism Company / Operator</p>
-                    <p className="text-[11px] text-gray-500">Fleet operator or travel agency</p>
-                  </div>
-                </div>
-              </div>
-
               {/* Business Name & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label={providerType === 'company' ? 'Company Name' : 'Host / Business Name'}
+                  label="Host / Business Name"
                   required
-                  placeholder={providerType === 'company' ? 'e.g. Royal Travels Pvt Ltd' : 'e.g. Ramesh Rides'}
+                  placeholder="e.g. Ramesh Rides or Kovai Foothill Travels"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                 />
@@ -190,9 +155,9 @@ export default function BecomeProviderPage() {
                   value={serviceCategory}
                   onChange={(e) => setServiceCategory(e.target.value)}
                   options={[
-                    { label: '🏍️ Bike Rental (Hourly)', value: 'bike' },
-                    { label: '🚗 Car Rental (Hourly)', value: 'car' },
-                    { label: '🚐 Van Rental (Hourly)', value: 'van' },
+                    { label: '🏍️ Bike Tourist Ride (With Rider)', value: 'bike' },
+                    { label: '🚗 Car Tourist Ride (With Chauffeur)', value: 'car' },
+                    { label: '🚐 Van Group Tour (With Driver)', value: 'van' },
                     { label: '🧑‍🏫 Local Tour Guide', value: 'local_guide' },
                     { label: '🗺️ Sightseeing Tours', value: 'sightseeing_tour' },
                     { label: '🎭 Local Experiences', value: 'experience' },

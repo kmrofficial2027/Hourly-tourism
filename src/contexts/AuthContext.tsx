@@ -52,7 +52,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null
         }
 
-        cachedProfile = data as Profile
+        const profileData = { ...(data as Profile) }
+
+        // If not admin, verify if a provider_profiles record exists to ensure provider role is never lost
+        if (profileData.role !== 'admin') {
+          try {
+            const { data: provRec } = await supabase
+              .from('provider_profiles')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle()
+
+            if (provRec?.id) {
+              profileData.role = 'provider'
+            }
+          } catch {}
+        }
+
+        cachedProfile = profileData
         return cachedProfile
       } catch (err) {
         return null
@@ -63,6 +80,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize Auth once on app mount
   useEffect(() => {
+    // Canonicalize any preview hash domains to production
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      if (
+        hostname.endsWith('.netlify.app') &&
+        hostname !== 'hourlytourism.netlify.app' &&
+        !hostname.includes('localhost')
+      ) {
+        window.location.replace(`https://hourlytourism.netlify.app${window.location.pathname}${window.location.search}`)
+        return
+      }
+    }
+
     let isMounted = true
 
     const init = async () => {
@@ -232,7 +262,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hourlytourism.netlify.app'
+    let origin = 'https://hourlytourism.netlify.app'
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname.includes('localhost') || window.location.hostname === '127.0.0.1') {
+        origin = window.location.origin
+      }
+    }
     const roleParam = encodeURIComponent(role)
     const redirParam = encodeURIComponent(redirectPath || '')
     const redirectTo = `${origin}/auth/callback?role=${roleParam}&redirect=${redirParam}`

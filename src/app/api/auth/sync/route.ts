@@ -16,17 +16,23 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const { role, fullName, phone } = body
 
-    const targetRole = ['customer', 'provider', 'company', 'admin'].includes(role)
+    const targetRole = ['customer', 'provider', 'admin'].includes(role)
       ? role
       : 'customer'
 
     const adminSupabase = await createAdminSupabaseClient()
 
-    // 1. Check or fetch existing profile
+    // 1. Check or fetch existing profile and provider status
     const { data: existingProfile } = await adminSupabase
       .from('profiles')
       .select('id, role, full_name, phone')
       .eq('id', user.id)
+      .maybeSingle()
+
+    const { data: existingProviderRecord } = await adminSupabase
+      .from('provider_profiles')
+      .select('id')
+      .eq('user_id', user.id)
       .maybeSingle()
 
     // Strict Role Preservation: If user already has a profile with a role, prevent accidental cross-role overwrite
@@ -34,6 +40,9 @@ export async function POST(request: Request) {
     if (existingProfile?.role) {
       if (existingProfile.role === 'admin') {
         finalRole = 'admin'
+      } else if (existingProviderRecord) {
+        // User has an established provider profile
+        finalRole = 'provider'
       } else if (existingProfile.role === 'customer' && targetRole !== 'customer') {
         return NextResponse.json(
           {
@@ -91,23 +100,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. If company, ensure a company_profiles record exists
-    if (finalRole === 'company') {
-      const { data: existingCompany } = await adminSupabase
-        .from('company_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (!existingCompany) {
-        await adminSupabase.from('company_profiles').insert({
-          user_id: user.id,
-          company_name: fullName || 'Commercial Fleet',
-          verification_status: 'approved',
-        })
-      }
-    }
-
     return NextResponse.json({
       success: true,
       role: finalRole,
@@ -145,21 +137,15 @@ export async function GET() {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    const { data: comp } = await adminSupabase
-      .from('company_profiles')
-      .select('id, verification_status')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
     let effectiveRole = profile?.role || (user.user_metadata?.role as string) || 'customer'
-    if (comp) effectiveRole = 'company'
-    else if (prov && effectiveRole !== 'company') effectiveRole = 'provider'
+    if (effectiveRole === 'company' || prov) {
+      effectiveRole = 'provider'
+    }
 
     return NextResponse.json({
       role: effectiveRole,
       profile,
       hasProviderProfile: !!prov,
-      hasCompanyProfile: !!comp,
     })
   } catch (err: any) {
     console.error('Auth sync GET error:', err)

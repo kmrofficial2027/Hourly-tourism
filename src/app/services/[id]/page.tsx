@@ -19,6 +19,8 @@ import {
   Heart,
   ChevronLeft,
   MessageCircle,
+  Sparkles,
+  Compass,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -30,6 +32,7 @@ import { Rating } from '@/components/ui/Rating'
 import { Button } from '@/components/ui/Button'
 import { FullPageLoader } from '@/components/ui/LoadingSpinner'
 import { CURRENCY_SYMBOL } from '@/lib/constants'
+import { normalizeListingImages } from '@/lib/utils'
 
 // Fallback demo dataset for initial previews or offline testing
 const demoListingsData: Record<string, any> = {
@@ -56,25 +59,50 @@ const demoListingsData: Record<string, any> = {
     pickup_location: 'RS Puram Hub / Gandhipuram / Peelamedu Airport Delivery',
     meeting_point: 'RS Puram Head Office or Isha Gateway Toll Point',
     max_participants: 2,
+    planned_spots: [
+      {
+        id: 'spot-1',
+        name: 'Isha Yoga & 112-ft Adiyogi Shiva Statue',
+        duration: '1.5 Hours',
+        category: 'Spiritual & Sightseeing',
+        description: 'Marvel at the monumental 112-foot bust of Adiyogi Shiva, Dhyanalinga silence, and sacred Theerthakund dip.',
+        insider_tip: 'Stay for the spectacular 7:00 PM 3D laser sound and light projection.',
+      },
+      {
+        id: 'spot-2',
+        name: 'Velliangiri Foothills Palm-Lined Country Loop',
+        duration: '45 Mins',
+        category: 'Scenic Foothills',
+        description: 'Breeze along shaded coconut canopies, sugarcane fields, and refreshing mountain slopes.',
+        insider_tip: 'Ask host to stop at the historic village stream bridge for panoramic photos.',
+      },
+      {
+        id: 'spot-3',
+        name: 'Thondamuthur Village Wood-Fired Chai Stop',
+        duration: '30 Mins',
+        category: 'Local Hospitality',
+        description: 'Enjoy traditional jaggery filter coffee and fresh tender coconut with your local rider host.',
+        insider_tip: 'Authentic palm sugar snacks available directly from local farm stalls.',
+      },
+    ],
     images: [
       'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
     ],
     included_services: [
-      'Two ISI-certified full-face helmets',
-      'Full tank of fuel at start (fair usage policy)',
-      'Third-party comprehensive vehicle insurance',
+      'Accompanied by verified local rider host on their personal Royal Enfield',
+      'Fuel for the entire booked tour duration (no extra fuel cost)',
+      'Complimentary sanitized ISI-certified helmet for guest pillion rider',
       'Waterproof phone mount with fast USB charging',
-      '24/7 roadside breakdown assistance in Coimbatore & Thondamuthur',
+      'Local insider storytelling, cultural guidance, and photo assistance',
     ],
     excluded_services: [
-      'Parking entry fees at Isha or monument locations',
-      'Fuel top-up beyond initial reserve',
-      'Personal travel insurance',
+      'Personal temple donation or souvenir purchases',
+      'Dining expenses beyond complimentary chai',
     ],
     terms_and_conditions:
-      'Valid Indian or International 2-wheeler driving license required. Refundable security deposit of ₹1,000 collected at pickup. Helmets strictly mandatory for both rider and pillion.',
+      'This is a rider-hosted hourly tourist service. Your registered local host meets you at the pickup location with their personal vehicle and drives/guides you to all scheduled spots during your booked hours.',
     cancellation_policy:
       'Free cancellation up to 4 hours before the booked start time. 50% refund for cancellations within 4 hours. No refund after start time.',
     vehicle_details: {
@@ -84,16 +112,16 @@ const demoListingsData: Record<string, any> = {
       year: 2023,
       passenger_capacity: 2,
       fuel_type: 'Petrol',
-      features: ['Electric Start', 'Dual Channel ABS', 'Mobile Charger', 'Tubeless Tyres'],
+      features: ['Personal Host Rider Included', 'Dual Channel ABS', 'Mobile Charger', 'Luggage Carrier'],
     },
     packages: [
-      { id: 'pkg-1', name: 'Adiyogi Sunset Express', duration_hours: 3, price: 520, description: 'Direct cruise to Isha, Theerthakund, and evening Adiyogi laser show' },
+      { id: 'pkg-1', name: 'Adiyogi Sunset Express', duration_hours: 3, price: 520, description: 'Direct ride to Isha, Theerthakund, and evening Adiyogi laser show' },
       { id: 'pkg-2', name: 'Western Ghats Foothills Loop', duration_hours: 6, price: 999, description: 'Isha, Kovai Kutralam waterfalls, and scenic village backroads' },
       { id: 'pkg-3', name: 'Full Day Nilgiri Country', duration_hours: 10, price: 1599, description: 'Unlimited riding covering Mettupalayam foothills and Bhavani river' },
     ],
     provider: {
-      business_name: 'Kovai Foothill Riders',
-      description: 'Coimbatore’s top-rated two-wheeler self-drive mobility provider with over 4,000 satisfied riders.',
+      business_name: 'Kovai Foothill Riders & Hosts',
+      description: 'Verified motorcycle enthusiast hosting guided hourly foothill rides and scenic tours in Coimbatore in their free time.',
       city: 'Coimbatore',
       languages: ['Tamil', 'English', 'Malayalam'],
       verification_status: 'approved',
@@ -704,7 +732,7 @@ const demoListingsData: Record<string, any> = {
     ],
     provider: {
       business_name: 'Velliangiri Moto Expeditions',
-      description: 'Premium adventure motorcycle rentals and Western Ghats expedition specialists.',
+      description: 'Premium adventure motorcycle tours and Western Ghats expedition specialists.',
       city: 'Coimbatore',
       languages: ['Tamil', 'English', 'Malayalam'],
       verification_status: 'approved',
@@ -833,8 +861,8 @@ const demoListingsData: Record<string, any> = {
       { id: 'pkg-bar-2', name: 'Complete Bhavani River Basin Tour', duration_hours: 9, price: 8600, description: 'Baralikadu coracle, Pillur dam catchment, and Mettupalayam fruit orchards' },
     ],
     provider: {
-      business_name: 'Western Ghats Van Rentals',
-      description: 'Trusted group transport provider for Western Ghats nature excursions and family reunions.',
+      business_name: 'Western Ghats Van Tours',
+      description: 'Trusted group transport and tour provider for Western Ghats nature excursions and family reunions.',
       city: 'Coimbatore',
       languages: ['Tamil', 'English', 'Malayalam'],
       verification_status: 'approved',
@@ -1120,9 +1148,7 @@ export default function ServiceDetailPage() {
     )
   }
 
-  const images = listing.images && listing.images.length > 0
-    ? listing.images
-    : ['https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80']
+  const images = normalizeListingImages(listing.images, listing.category)
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50/50">
@@ -1185,9 +1211,8 @@ export default function ServiceDetailPage() {
               <div
                 key={idx}
                 onClick={() => setActiveImageIndex(idx)}
-                className={`relative aspect-[16/10] rounded-2xl overflow-hidden cursor-pointer border-2 transition-all flex-1 ${
-                  activeImageIndex === idx ? 'border-[#ff7a00] shadow-md' : 'border-transparent opacity-75 hover:opacity-100'
-                }`}
+                className={`relative aspect-[16/10] rounded-2xl overflow-hidden cursor-pointer border-2 transition-all flex-1 ${activeImageIndex === idx ? 'border-[#ff7a00] shadow-md' : 'border-transparent opacity-75 hover:opacity-100'
+                  }`}
               >
                 <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
               </div>
@@ -1235,6 +1260,104 @@ export default function ServiceDetailPage() {
                 Contact Host
               </button>
             </div>
+
+            {/* Rider-Hosted Notice Banner */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 shadow-xs flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-700/20 text-lg">
+                {listing.category === 'bike' ? '🏍️' : listing.category === 'car' ? '🚗' : listing.category === 'van' ? '🚐' : '🧭'}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-black text-xs uppercase tracking-wider text-emerald-950 font-display">
+                    {listing.category === 'bike'
+                      ? 'Rider-Hosted Two-Wheeler Tour'
+                      : listing.category === 'car'
+                        ? 'Host-Chauffeured Car Sightseeing'
+                        : listing.category === 'van'
+                          ? 'Local Driver Group Tour'
+                          : 'Verified Local Guide Trip'}
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-700 text-white">
+                    Rider & Fuel Included
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-900 leading-relaxed">
+                  This is an hourly tourist service provided by a verified registered local vehicle owner in their free time. Your host meets you with their personal vehicle, drives/rides you across the planned places, and shares insider local knowledge throughout your booked hours.
+                </p>
+              </div>
+            </div>
+
+            {/* Planned Trip Route & Stops */}
+            {listing.planned_spots && listing.planned_spots.length > 0 && (
+              <div className="p-6 sm:p-8 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-[#0a4d29]">
+                        Planned Trip Route
+                      </span>
+                      <span className="text-xs font-semibold text-gray-500">
+                        {listing.planned_spots.length} Planned Stops
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 font-display mt-1">
+                      Places & Attractions in this Hourly Tour
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Your local host will take you to these places in sequence during your booked hours.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 text-emerald-800 text-xs font-bold shrink-0">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    <span>Min {listing.min_booking_hours || 2} Hours Suggested</span>
+                  </div>
+                </div>
+
+                {/* Visual Stop-by-Stop Timeline */}
+                <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-emerald-200">
+                  {listing.planned_spots.map((spot: any, idx: number) => (
+                    <div key={idx} className="relative group">
+                      {/* Timeline node */}
+                      <div className="absolute -left-6 sm:-left-8 top-1 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-emerald-600/30 ring-4 ring-white">
+                        {idx + 1}
+                      </div>
+
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gray-50/90 border border-gray-100 hover:border-emerald-300 transition-all space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                            <span>{spot.name}</span>
+                            {spot.is_custom && (
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-purple-100 text-purple-700">
+                                Host Choice
+                              </span>
+                            )}
+                          </h4>
+                          {spot.duration && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white text-emerald-800 border border-emerald-200/80 shadow-xs flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-emerald-600" />
+                              <span>{spot.duration}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {spot.description && (
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            {spot.description}
+                          </p>
+                        )}
+
+                        {spot.insider_tip && (
+                          <div className="pt-2 border-t border-gray-200/60 text-xs text-orange-900 bg-orange-50/70 p-2.5 rounded-xl border border-orange-200/60 flex items-start gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />
+                            <span><strong>Host Insider Tip:</strong> {spot.insider_tip}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-4">
@@ -1295,6 +1418,100 @@ export default function ServiceDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Host Curated Unseen Tourist Spots & Hidden Gems */}
+            {((listing.unseen_spots && listing.unseen_spots.length > 0) ||
+              (listing.hidden_spots && listing.hidden_spots.length > 0)) && (
+                <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-950 via-[#0a4d29] to-[#041a0d] text-white shadow-xl space-y-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-300 border border-orange-400/30">
+                        Host Exclusive Curations
+                      </span>
+                      <span className="text-xs text-emerald-300 font-semibold">• Off the Beaten Track</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black font-display text-white">
+                      Unseen Tourist Spots & Secret Hidden Gems
+                    </h2>
+                    <p className="text-xs sm:text-sm text-emerald-100/80 mt-1">
+                      This local host knows Coimbatore and surrounding circuits inside out. Discover authentic spots beyond standard tourist trails.
+                    </p>
+                  </div>
+
+                  {/* Unseen Spots List */}
+                  {listing.unseen_spots && listing.unseen_spots.length > 0 && (
+                    <div className="space-y-3 relative z-10">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                        <Compass className="w-4 h-4 text-emerald-400" />
+                        Unseen Tourist Spots ({listing.unseen_spots.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {listing.unseen_spots.map((spot: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 space-y-2 hover:bg-white/15 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <h5 className="font-bold text-sm text-white">{spot.name}</h5>
+                              {spot.duration && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/30">
+                                  {spot.duration}
+                                </span>
+                              )}
+                            </div>
+                            {spot.description && (
+                              <p className="text-xs text-emerald-100/90 leading-relaxed font-normal">
+                                {spot.description}
+                              </p>
+                            )}
+                            {spot.tip && (
+                              <p className="text-[11px] text-orange-300 font-medium pt-1 border-t border-white/10 flex items-center gap-1">
+                                <span>💡</span>
+                                <span><strong>Host Tip:</strong> {spot.tip}</span>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hidden Gems List */}
+                  {listing.hidden_spots && listing.hidden_spots.length > 0 && (
+                    <div className="space-y-3 relative z-10 pt-2 border-t border-white/10">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-orange-300 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-orange-400" />
+                        Hidden Gems & Secret Stops ({listing.hidden_spots.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {listing.hidden_spots.map((gem: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 space-y-2 hover:bg-white/15 transition-colors"
+                          >
+                            <h5 className="font-bold text-sm text-white flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-orange-400" />
+                              {gem.name}
+                            </h5>
+                            {gem.description && (
+                              <p className="text-xs text-emerald-100/90 leading-relaxed font-normal">
+                                {gem.description}
+                              </p>
+                            )}
+                            {gem.tip && (
+                              <p className="text-[11px] text-amber-300 font-medium pt-1 border-t border-white/10 flex items-center gap-1">
+                                <span>✨</span>
+                                <span><strong>Secret Insight:</strong> {gem.tip}</span>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* Included & Excluded services */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-6">

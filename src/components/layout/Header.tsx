@@ -48,10 +48,7 @@ export function Header() {
   const navLinks = [
     { label: 'Home', href: '/' },
     { label: 'Explore', href: '/explore' },
-    { label: 'Vehicles', href: '/vehicles' },
-    { label: 'Local Guides', href: '/guides' },
-    { label: 'Tours & Experiences', href: '/tours' },
-    { label: 'Coimbatore Guide', href: '/coimbatore-guide' },
+    { label: 'Regional Guides', href: '/regional-guides' },
   ]
 
   const getDashboardHref = () => {
@@ -61,8 +58,6 @@ export function Header() {
         return '/admin'
       case 'provider':
         return '/provider'
-      case 'company':
-        return '/company'
       default:
         return '/dashboard'
     }

@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')?.trim().toLowerCase()
-    const targetRole = searchParams.get('role') // 'customer' | 'provider' | 'company'
+    const targetRole = searchParams.get('role') // 'customer' | 'provider'
 
     if (!email) {
       return NextResponse.json({ error: 'Email parameter required' }, { status: 400 })
@@ -32,11 +32,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ exists: false })
     }
 
-    const roleMatches = targetRole ? profile.role === targetRole : true
+    // Check if the user has a provider_profiles record
+    let effectiveRole = profile.role
+    if (effectiveRole !== 'admin') {
+      const { data: prov } = await adminSupabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', profile.id)
+        .maybeSingle()
+
+      if (prov?.id) {
+        effectiveRole = 'provider'
+      }
+    }
+
+    const roleMatches = targetRole ? effectiveRole === targetRole : true
 
     return NextResponse.json({
       exists: true,
-      registeredRole: profile.role,
+      registeredRole: effectiveRole,
       fullName: profile.full_name,
       roleMatches,
       isActive: profile.is_active,

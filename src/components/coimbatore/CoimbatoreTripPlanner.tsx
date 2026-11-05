@@ -22,6 +22,7 @@ import {
 
 export interface CoimbatoreCircuit {
   id: string
+  region: 'Coimbatore' | 'Pollachi'
   title: string
   category: 'Spiritual' | 'Hills & Ghats' | 'Eco & Rainforest' | 'Heritage & Culture' | 'Rural & Wildlife'
   tagline: string
@@ -40,6 +41,7 @@ export interface CoimbatoreCircuit {
 export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
   {
     id: 'isha-adiyogi',
+    region: 'Coimbatore',
     title: 'Isha Yoga & 112-ft Adiyogi Shiva Statue',
     category: 'Spiritual',
     tagline: 'Velliangiri Foothills sunset meditation & 3D projection show',
@@ -60,28 +62,8 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
     searchDestination: 'Isha',
   },
   {
-    id: 'valparai-ghats',
-    title: 'Valparai 40 Hairpin Ghats & Tea Estates',
-    category: 'Hills & Ghats',
-    tagline: 'Scenic mountain climb to 3,500 ft amidst cloud-kissed tea plateaus',
-    distanceKm: 105,
-    idealDurationHours: '8 to 12 Hours',
-    bestTimeOfDay: 'Early Morning (Depart 6:30 AM)',
-    recommendedTransport: '12-Seater Luxury Van (Force Urbania) or 4x4 SUV',
-    transportType: 'van',
-    estimatedStartingRate: 1100,
-    keyAttractions: [
-      '40 Numbered Hairpin Bends overlooking Aliyar Dam',
-      'Loam’s View Point & Carver Marsh Memorial',
-      'Endangered Nilgiri Tahr & Lion-tailed Macaque spotting',
-      'Heritage High-Altitude Tea Factories & Estates',
-    ],
-    proTip: 'Check-in at Aliyar forest gate before 9:00 AM. A hill-experienced chauffeur is recommended for hairpins 15 to 28.',
-    image: 'https://images.unsplash.com/photo-1527786356703-4b100091cd2c?auto=format&fit=crop&w=1000&q=80',
-    searchDestination: 'Valparai',
-  },
-  {
-    id: 'siruvani-falls',
+    id: 'siruvani-rainforest',
+    region: 'Coimbatore',
     title: 'Siruvani Waterfalls & Bio-Reserve Rainforest',
     category: 'Eco & Rainforest',
     tagline: 'Taste the world-renowned sweet mineral water in pristine Western Ghats',
@@ -103,6 +85,7 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
   },
   {
     id: 'marudhamalai-hills',
+    region: 'Coimbatore',
     title: 'Marudhamalai Murugan Hill Temple',
     category: 'Spiritual',
     tagline: '7th-century hill shrine enveloped in sacred Western Ghats herbal breezes',
@@ -123,28 +106,8 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
     searchDestination: 'Marudhamalai',
   },
   {
-    id: 'pollachi-country',
-    title: 'Pollachi Coconut Groves & PAP Canal Roads',
-    category: 'Rural & Wildlife',
-    tagline: 'Cinema-famous canal roads, Topslip elephant safari, and rural tranquility',
-    distanceKm: 42,
-    idealDurationHours: '5 to 7 Hours',
-    bestTimeOfDay: 'Morning 7:30 AM or Late Afternoon 3:30 PM',
-    recommendedTransport: 'Mahindra Thar 4x4 or 9-Seater Van',
-    transportType: 'car',
-    estimatedStartingRate: 750,
-    keyAttractions: [
-      'PAP Irrigation Canal roads lined with tens of thousands of coconut palms',
-      'Sethumadai village farmlands & film shooting locations',
-      'Topslip Anamalai Tiger Reserve & Kozhikamuthi Elephant Camp',
-      'Organic jaggery mills & roadside tender coconut pitstops',
-    ],
-    proTip: 'Stop for sweet Samathur tender coconut (Elaneer) by the canal bridge. Topslip forest safari requires entry before 2 PM.',
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1000&q=80',
-    searchDestination: 'Pollachi',
-  },
-  {
     id: 'perur-heritage',
+    region: 'Coimbatore',
     title: 'Perur Pateeswarar Temple & Chola Art Heritage',
     category: 'Heritage & Culture',
     tagline: '1500-year-old stone temple with the world-famous Kanaka Sabha hall',
@@ -166,6 +129,7 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
   },
   {
     id: 'gedee-museum-food',
+    region: 'Coimbatore',
     title: 'Gedee Car Museum & Kongunadu Culinary Trail',
     category: 'Heritage & Culture',
     tagline: '70+ vintage classic cars paired with legendary Kovai filter coffee & food',
@@ -187,6 +151,7 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
   },
   {
     id: 'baralikadu-eco',
+    region: 'Coimbatore',
     title: 'Baralikadu Parisal Coracle & Pillur Dam Eco-Picnic',
     category: 'Eco & Rainforest',
     tagline: 'Forest river coracle ride and traditional Irula tribal feast in Bhavani valley',
@@ -206,53 +171,307 @@ export const COIMBATORE_CIRCUITS: CoimbatoreCircuit[] = [
     image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1000&q=80',
     searchDestination: 'Baralikadu',
   },
+  // Pollachi Regional Circuits
+  {
+    id: 'pollachi-aliyar',
+    region: 'Pollachi',
+    title: 'Aliyar Dam, Reservoir Gardens & Monkey Falls',
+    category: 'Eco & Rainforest',
+    tagline: 'Scenic foothill reservoir, manicured park & refreshing natural waterfalls',
+    distanceKm: 24,
+    idealDurationHours: '3 to 5 Hours',
+    bestTimeOfDay: '8:30 AM – 1:30 PM (Cool mountain water flow)',
+    recommendedTransport: 'Royal Enfield Cruiser Bike or Chauffeur Sedan',
+    transportType: 'bike',
+    estimatedStartingRate: 190,
+    keyAttractions: [
+      'Aliyar Dam reservoir bund walk & manicured park gardens',
+      'Monkey Falls natural cascades & natural spring baths',
+      'Aliyar Contour Canal aqueduct walk through coconut groves',
+      'Panoramic photography of towering Anamalai peaks',
+    ],
+    proTip: 'Visit Monkey Falls early before 11 AM. Carry extra clothes for natural stream dip.',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80',
+    searchDestination: 'Pollachi',
+  },
+  {
+    id: 'pollachi-valparai',
+    region: 'Pollachi',
+    title: 'Valparai 40 Hairpins & Cloud-Kissed Tea Plateaus',
+    category: 'Hills & Ghats',
+    tagline: 'Ascend 3,500 ft through 40 numbered mountain curves with wild Nilgiri Tahr sightings',
+    distanceKm: 64,
+    idealDurationHours: '6 to 10 Hours',
+    bestTimeOfDay: 'Depart 6:30 AM for early morning ghat mist',
+    recommendedTransport: '12-Seater Luxury Van or Chauffeur SUV',
+    transportType: 'van',
+    estimatedStartingRate: 1100,
+    keyAttractions: [
+      '40 numbered hairpin bends with bird-eye reservoir views',
+      'Loam’s Viewpoint overlooking entire Pollachi plains',
+      'High-altitude organic tea factories and sprawling plantations',
+      'Rare wildlife spotting: Lion-tailed macaques & Nilgiri Tahr',
+    ],
+    proTip: 'Stop at the 9th hairpin bend for breathtaking valley photos. Dress in light woolens for the hill chill.',
+    image: 'https://images.unsplash.com/photo-1527786356703-4b100091cd2c?auto=format&fit=crop&w=1000&q=80',
+    searchDestination: 'Valparai',
+  },
+  {
+    id: 'pollachi-topslip',
+    region: 'Pollachi',
+    title: 'Topslip Tiger Reserve & Kozhikamuthi Elephant Safari',
+    category: 'Rural & Wildlife',
+    tagline: 'Dense evergreen rainforest safari & ethical elephant rehabilitation camp',
+    distanceKm: 38,
+    idealDurationHours: '5 to 7 Hours',
+    bestTimeOfDay: '7:00 AM – 12:00 PM (Forest Department safari timings)',
+    recommendedTransport: 'Mahindra Thar 4x4 or Rural Tour Van',
+    transportType: 'car',
+    estimatedStartingRate: 750,
+    keyAttractions: [
+      'Kozhikamuthi elephant camp feeding & bathing interaction',
+      'Anamalai Tiger Reserve deep rainforest safari trail',
+      'Canopy walking trails & bird-watching in bamboo thickets',
+      'Scenic teak plantation drive through Sethumadai valley',
+    ],
+    proTip: 'Forest checkpost entry opens at 7 AM. Keep valid government ID handy for forest department entry tokens.',
+    image: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=1000&q=80',
+    searchDestination: 'Topslip',
+  },
+  {
+    id: 'pollachi-canal',
+    region: 'Pollachi',
+    title: 'Pollachi Coconut Canal & Film Countryside Trail',
+    category: 'Rural & Wildlife',
+    tagline: 'Lush canal roads beneath swaying coconut canopies made famous by cinema',
+    distanceKm: 18,
+    idealDurationHours: '2 to 4 Hours',
+    bestTimeOfDay: '7:30 AM – 10:30 AM or 4:00 PM – 6:30 PM',
+    recommendedTransport: 'Two-Wheeler Cruiser or Open-top 4x4',
+    transportType: 'bike',
+    estimatedStartingRate: 180,
+    keyAttractions: [
+      'PAP Irrigation Canal roads lined with tens of thousands of coconut palms',
+      'Sethumadai farmlands & iconic movie shooting spots',
+      'Fresh farm-gate tender coconut water (Samathur Elaneer)',
+      'Masani Amman sacred temple riverbank heritage',
+    ],
+    proTip: 'Stop by Samathur village for sweet tender coconut straight from the trees at half city rates.',
+    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1000&q=80',
+    searchDestination: 'Pollachi',
+  },
 ]
 
-export function CoimbatoreTripPlanner() {
-  const [selectedCircuit, setSelectedCircuit] = useState<CoimbatoreCircuit>(COIMBATORE_CIRCUITS[0])
+interface CoimbatoreTripPlannerProps {
+  initialRegion?: string
+}
+
+export function CoimbatoreTripPlanner({ initialRegion = 'Coimbatore' }: CoimbatoreTripPlannerProps) {
+  const [activeCities, setActiveCities] = useState<any[]>([])
+  const [selectedRegion, setSelectedRegion] = useState<string>(initialRegion)
   const [activeFilter, setActiveFilter] = useState<string>('All')
+  const [loading, setLoading] = useState(false)
 
-  const categories = ['All', 'Spiritual', 'Hills & Ghats', 'Eco & Rainforest', 'Heritage & Culture', 'Rural & Wildlife']
+  // Fetch active launched destinations
+  React.useEffect(() => {
+    async function loadCities() {
+      try {
+        const res = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          const list = data.destinations || data.cities || []
+          if (list.length > 0) {
+            setActiveCities(list)
+            // If initialRegion is not in list, pick the first one
+            const exists = list.some((c: any) => c.name.toLowerCase() === selectedRegion.toLowerCase())
+            if (!exists) {
+              setSelectedRegion(list[0].name)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load destinations in trip planner:', err)
+      }
+    }
+    loadCities()
+  }, [])
 
-  const filteredCircuits = activeFilter === 'All'
-    ? COIMBATORE_CIRCUITS
-    : COIMBATORE_CIRCUITS.filter(c => c.category === activeFilter)
+  // Find active city object
+  const currentCityObj = activeCities.find(
+    (c: any) => c.name.toLowerCase() === selectedRegion.toLowerCase()
+  )
+
+  // Build circuits for current city
+  const regionCircuits: CoimbatoreCircuit[] = React.useMemo(() => {
+    // 1. If Coimbatore or Pollachi and hardcoded circuits exist
+    const hardcoded = COIMBATORE_CIRCUITS.filter(
+      (c) => c.region.toLowerCase() === selectedRegion.toLowerCase()
+    )
+
+    // 2. If current city has guide circuits, convert them
+    if (currentCityObj?.guide?.circuits && currentCityObj.guide.circuits.length > 0) {
+      const guideCircuits = currentCityObj.guide.circuits.map((gc: any, idx: number) => ({
+        id: gc.id || `circuit-${idx}`,
+        region: selectedRegion as any,
+        title: gc.title,
+        category: (gc.category || 'Hills & Ghats') as any,
+        tagline: gc.tagline || `Discover scenic landmarks and viewpoints in ${selectedRegion}`,
+        distanceKm: gc.distance_km || 25,
+        idealDurationHours: gc.ideal_duration || '3 to 5 Hours',
+        bestTimeOfDay: gc.best_time_of_day || '9:00 AM – 2:00 PM',
+        recommendedTransport: gc.recommended_transport || 'Cruiser Bike or AC Sedan',
+        transportType: (gc.transport_type || 'bike') as any,
+        estimatedStartingRate: gc.estimated_rate || 200,
+        keyAttractions: gc.key_attractions || [],
+        proTip: gc.pro_tip || `Enjoy the fresh hill breeze and plan with local certified hosts.`,
+        image: gc.image_url || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80',
+        searchDestination: selectedRegion,
+      }))
+
+      // If hardcoded exists and is non-empty, merge or prioritize
+      if (hardcoded.length > 0 && (selectedRegion.toLowerCase() === 'coimbatore' || selectedRegion.toLowerCase() === 'pollachi')) {
+        return hardcoded
+      }
+      return guideCircuits
+    }
+
+    if (hardcoded.length > 0) return hardcoded
+
+    // 3. If no circuits yet, generate fallback circuits from top_spots
+    if (currentCityObj?.top_spots?.length) {
+      return currentCityObj.top_spots.slice(0, 3).map((spot: any, idx: number) => ({
+        id: spot.id || `spot-${idx}`,
+        region: selectedRegion as any,
+        title: spot.name,
+        category: 'Hills & Ghats' as any,
+        tagline: spot.description,
+        distanceKm: 20 + idx * 8,
+        idealDurationHours: spot.recommended_hours || '3 to 4 Hours',
+        bestTimeOfDay: '8:30 AM – 1:30 PM',
+        recommendedTransport: 'Cruiser Bike or AC Sedan',
+        transportType: 'car' as any,
+        estimatedStartingRate: 350,
+        keyAttractions: [spot.name, `${selectedRegion} City Center`, 'Local Scenic Viewpoint'],
+        proTip: spot.insider_tip || 'Start early morning for clear views and breezy drives.',
+        image: spot.image_url || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80',
+        searchDestination: selectedRegion,
+      }))
+    }
+
+    return COIMBATORE_CIRCUITS.slice(0, 3)
+  }, [selectedRegion, currentCityObj])
+
+  const [selectedCircuit, setSelectedCircuit] = useState<CoimbatoreCircuit>(
+    regionCircuits[0] || COIMBATORE_CIRCUITS[0]
+  )
+
+  // Keep selected circuit in sync when region changes
+  React.useEffect(() => {
+    if (regionCircuits.length > 0) {
+      setSelectedCircuit(regionCircuits[0])
+    }
+  }, [regionCircuits])
+
+  const handleRegionChange = (newRegion: string) => {
+    setSelectedRegion(newRegion)
+    setActiveFilter('All')
+  }
+
+  // Extract dynamic categories from active circuits
+  const dynamicCategories = React.useMemo(() => {
+    const cats = new Set<string>()
+    cats.add('All')
+    regionCircuits.forEach((c) => {
+      if (c.category) cats.add(c.category)
+    })
+    return Array.from(cats)
+  }, [regionCircuits])
+
+  const filteredCircuits =
+    activeFilter === 'All'
+      ? regionCircuits
+      : regionCircuits.filter((c) => c.category === activeFilter)
+
+  const regionBadge = `${selectedRegion} Hourly Curations`
+  const regionTitle = `Featured Hourly Trips in & around ${selectedRegion}`
+  const regionSubtitle =
+    currentCityObj?.guide?.overview ||
+    currentCityObj?.description ||
+    `Explore ${selectedRegion} on your terms with verified local riders and chauffeurs. No rigid full-day tariffs—book hourly circuits and discover monuments, secret waterfalls, and panoramic viewpoints.`
+
+  const regionExploreLink = `/explore?destination=${encodeURIComponent(selectedRegion)}`
+  const regionExploreText = `View All ${selectedRegion} Curations`
+
+  // Cities to render in the pill bar (from activeCities or defaults)
+  const displayCities =
+    activeCities.length > 0
+      ? activeCities
+      : [{ id: 'coimbatore', name: 'Coimbatore' }, { id: 'pollachi', name: 'Pollachi' }]
 
   return (
-    <div className="bg-gradient-to-b from-emerald-950 via-gray-900 to-gray-900 text-white py-20 px-4 sm:px-6 lg:px-8 rounded-[40px] my-12 shadow-2xl relative overflow-hidden">
+    <div className="bg-gradient-to-b from-emerald-950 via-gray-900 to-gray-900 text-white py-16 px-4 sm:px-6 lg:px-8 rounded-[40px] my-10 shadow-2xl relative overflow-hidden">
       {/* Background ambient lighting */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-10 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto relative z-10">
+        {/* Region Switcher Pills — Dynamically displays ALL active cities */}
+        <div className="flex flex-wrap items-center gap-3 mb-8 pb-6 border-b border-white/10">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mr-2">
+            <Compass className="w-4 h-4 text-emerald-400" />
+            <span>Select Active Region:</span>
+          </span>
+
+          {displayCities.map((city: any) => {
+            const isSelected = selectedRegion.toLowerCase() === city.name.toLowerCase()
+            return (
+              <button
+                key={city.id || city.name}
+                type="button"
+                onClick={() => handleRegionChange(city.name)}
+                className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                <span>📍 {city.name}</span>
+                {city.is_active && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10">
           <div className="max-w-2xl">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3 border border-emerald-500/30">
               <MapPin className="w-3.5 h-3.5" />
-              <span>Coimbatore Startup Launch Edition</span>
+              <span>{regionBadge}</span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black font-display tracking-tight text-white">
-              Discover Coimbatore by the Hour
+              {regionTitle}
             </h2>
             <p className="text-gray-300 text-sm sm:text-base mt-3 leading-relaxed">
-              Explore temples, mountain ghats, sweet water cascades, and tea plateaus without paying for a full-day driver.
-              Select a circuit to see the optimal hours, vehicle, and insider tips.
+              {regionSubtitle}
             </p>
           </div>
 
           <Link
-            href="/explore?destination=Coimbatore"
+            href={regionExploreLink}
             className="mt-6 md:mt-0 inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs backdrop-blur-md transition-all border border-white/10"
           >
-            <span>View All 15+ Coimbatore Listings</span>
+            <span>{regionExploreText}</span>
             <ArrowRight className="w-4 h-4 text-emerald-400" />
           </Link>
         </div>
 
         {/* Filter Pills */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-4 mb-8 no-scrollbar">
-          {categories.map((cat) => (
+          {dynamicCategories.map((cat) => (
             <button
               key={cat}
               type="button"
@@ -412,4 +631,6 @@ export function CoimbatoreTripPlanner() {
     </div>
   )
 }
+
+export const RegionalTripPlanner = CoimbatoreTripPlanner
 

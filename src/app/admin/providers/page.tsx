@@ -18,11 +18,18 @@ import {
   MapPin,
   ExternalLink,
   Trash2,
+  FileSpreadsheet,
+  Car,
+  Bike,
+  Truck,
+  UserCheck,
+  Sparkles,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { showToast } from '@/components/ui/Toast'
+import { exportToCSV } from '@/lib/exportUtils'
 
 export default function AdminProvidersPage() {
   const [providers, setProviders] = useState<any[]>([])
@@ -99,7 +106,7 @@ export default function AdminProvidersPage() {
   }
 
   const handleDeleteProvider = async (provider: any) => {
-    if (!window.confirm(`Are you sure you want to permanently delete provider ${provider.business_name || provider.owner_name || provider.email}? All associated listings, vehicles, and fleet bookings will be permanently removed.`)) {
+    if (!window.confirm(`Are you sure you want to permanently delete provider ${provider.business_name || provider.owner_name || provider.email}? All associated listings, vehicle records, and bookings will be permanently removed.`)) {
       return
     }
     setActionLoading(true)
@@ -112,7 +119,7 @@ export default function AdminProvidersPage() {
         if (selectedProvider?.id === provider.id) {
           setSelectedProvider(null)
         }
-        showToast.success('Provider and all associated fleet listings removed successfully')
+        showToast.success('Provider and all associated records removed successfully')
       } else {
         const data = await res.json().catch(() => ({}))
         showToast.error(data.error || 'Failed to delete provider')
@@ -148,6 +155,19 @@ export default function AdminProvidersPage() {
     (p) => p.verification_status === 'pending' || p.status === 'pending'
   ).length
 
+  const handleExport = () => {
+    const columns = [
+      { header: 'Host Name', key: 'business_name' },
+      { header: 'Email', key: 'email' },
+      { header: 'Phone', key: 'phone' },
+      { header: 'City', key: 'city' },
+      { header: 'Status', key: 'status' },
+      { header: 'Verification Status', key: 'verification_status' },
+      { header: 'Created At', key: 'created_at' },
+    ]
+    exportToCSV(`admin-providers-export-${filterTab}`, filteredProviders, columns)
+  }
+
   return (
     <DashboardLayout role="admin" title="Provider Approvals & Verification">
       <div className="space-y-6">
@@ -162,9 +182,13 @@ export default function AdminProvidersPage() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={loadProviders} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={loadProviders} disabled={loading} className="rounded-xl">
               <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport} className="rounded-xl">
+              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+              Export CSV
             </Button>
           </div>
         </div>
@@ -349,6 +373,7 @@ export default function AdminProvidersPage() {
         {selectedProvider && (
           <Modal
             isOpen={true}
+            size="xl"
             onClose={() => {
               setSelectedProvider(null)
               setShowRejectInput(false)
@@ -356,7 +381,7 @@ export default function AdminProvidersPage() {
             }}
             title="Provider Compliance Dossier & Verification"
           >
-            <div className="space-y-6 pt-2">
+            <div className="space-y-6 pt-2 max-h-[80vh] overflow-y-auto pr-1">
               {/* Provider Overview Card */}
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div>
@@ -383,82 +408,308 @@ export default function AdminProvidersPage() {
                 </div>
               </div>
 
-              {/* Side-by-Side Comparison: ID Proof vs Live Selfie */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Government ID Proof */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    <span>
-                      {selectedProvider.documents?.id_type || 'Government ID Proof'}
-                    </span>
+              {/* Pillar 1: Host Government ID & Live Facial Selfie */}
+              <div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                    1
                   </div>
-                  {selectedProvider.documents?.id_number && (
-                    <p className="text-[11px] font-mono font-bold text-gray-600">
-                      ID Number: {selectedProvider.documents.id_number}
-                    </p>
-                  )}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900">Host Identity & Live Facial Selfie</h4>
+                    <p className="text-[11px] text-gray-500">Government identity verification and biometric facial comparison</p>
+                  </div>
+                </div>
 
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[220px]">
-                    {selectedProvider.documents?.id_card_front ? (
-                      <img
-                        src={selectedProvider.documents.id_card_front}
-                        alt="Government ID Proof Front"
-                        className="w-full max-h-60 object-contain bg-white"
-                      />
-                    ) : (
-                      <div className="p-6 text-center text-xs text-gray-400">
-                        <FileText className="w-8 h-8 mx-auto mb-1 text-gray-300" />
-                        No ID front document uploaded
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Government ID Proof */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      <span>
+                        {selectedProvider.documents?.id_type || 'Government ID Proof'}
+                      </span>
+                    </div>
+                    {selectedProvider.documents?.id_number && (
+                      <p className="text-[11px] font-mono font-bold text-gray-600">
+                        ID Number: {selectedProvider.documents.id_number}
+                      </p>
+                    )}
+
+                    <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[220px]">
+                      {selectedProvider.documents?.id_card_front ? (
+                        <img
+                          src={selectedProvider.documents.id_card_front}
+                          alt="Government ID Proof Front"
+                          className="w-full max-h-60 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-6 text-center text-xs text-gray-400">
+                          <FileText className="w-8 h-8 mx-auto mb-1 text-gray-300" />
+                          No ID front document uploaded
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedProvider.documents?.id_card_back && (
+                      <div className="pt-2">
+                        <span className="text-[11px] font-bold text-gray-500 block mb-1">
+                          Back Side / Address:
+                        </span>
+                        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white max-h-40 flex items-center justify-center">
+                          <img
+                            src={selectedProvider.documents.id_card_back}
+                            alt="ID Back"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {selectedProvider.documents?.id_card_back && (
-                    <div className="pt-2">
-                      <span className="text-[11px] font-bold text-gray-500 block mb-1">
-                        Back Side / Address:
-                      </span>
-                      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white max-h-40 flex items-center justify-center">
-                        <img
-                          src={selectedProvider.documents.id_card_back}
-                          alt="ID Back"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
+                  {/* Live Selfie Photo */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>Live Facial Selfie Photo</span>
                     </div>
+                    <p className="text-[11px] text-gray-500">
+                      Captured directly on-device by the host
+                    </p>
+
+                    <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[220px]">
+                      {selectedProvider.documents?.live_photo ? (
+                        <img
+                          src={selectedProvider.documents.live_photo}
+                          alt="Live Selfie Photo"
+                          className="w-full max-h-60 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-6 text-center text-xs text-gray-400">
+                          <Camera className="w-8 h-8 mx-auto mb-1 text-gray-300" />
+                          No live selfie photo uploaded
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-900 space-y-1">
+                      <p className="font-bold">Facial Audit Checklist:</p>
+                      <p>• Verify that the face on the ID matches the live selfie.</p>
+                      <p>• Verify the name on ID matches the registered host profile.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pillar 2: Driver Details & Driving Licence (DL) */}
+              <div className="pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                      2
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-900">Commercial Driver & Driving Licence</h4>
+                      <p className="text-[11px] text-gray-500">Driver identity and RTO commercial driving authorization</p>
+                    </div>
+                  </div>
+                  {selectedProvider.documents?.dl_number && (
+                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-mono font-bold">
+                      DL: {selectedProvider.documents.dl_number}
+                    </span>
                   )}
                 </div>
 
-                {/* Live Selfie Photo */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
-                    <Camera className="w-4 h-4 text-emerald-600" />
-                    <span>Live Facial Selfie Photo</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-xl mb-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Driver Name</span>
+                    <span className="font-bold text-gray-800">{selectedProvider.documents?.driver_name || selectedProvider.owner_name}</span>
                   </div>
-                  <p className="text-[11px] text-gray-500">
-                    Captured directly on-device by the host
-                  </p>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Driver Phone</span>
+                    <span className="font-bold text-gray-800">{selectedProvider.documents?.driver_phone || selectedProvider.phone}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Experience</span>
+                    <span className="font-bold text-gray-800">{selectedProvider.documents?.driver_experience ? `${selectedProvider.documents.driver_experience} Years` : '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">DL Expiry</span>
+                    <span className="font-bold text-gray-800">{selectedProvider.documents?.dl_expiry || '—'}</span>
+                  </div>
+                </div>
 
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[220px]">
-                    {selectedProvider.documents?.live_photo ? (
-                      <img
-                        src={selectedProvider.documents.live_photo}
-                        alt="Live Selfie Photo"
-                        className="w-full max-h-60 object-contain bg-white"
-                      />
-                    ) : (
-                      <div className="p-6 text-center text-xs text-gray-400">
-                        <Camera className="w-8 h-8 mx-auto mb-1 text-gray-300" />
-                        No live selfie photo uploaded
-                      </div>
+                {/* DL Documents Photos */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-600 block">Driving Licence (Front Side)</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[160px]">
+                      {selectedProvider.documents?.dl_front ? (
+                        <img
+                          src={selectedProvider.documents.dl_front}
+                          alt="Driving Licence Front"
+                          className="w-full max-h-48 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-4 text-center text-xs text-gray-400">
+                          <UserCheck className="w-6 h-6 mx-auto mb-1 text-gray-300" />
+                          No DL front uploaded
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-600 block">Driving Licence (Back Side / Endorsement)</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[160px]">
+                      {selectedProvider.documents?.dl_back ? (
+                        <img
+                          src={selectedProvider.documents.dl_back}
+                          alt="Driving Licence Back"
+                          className="w-full max-h-48 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-4 text-center text-xs text-gray-400">
+                          <UserCheck className="w-6 h-6 mx-auto mb-1 text-gray-300" />
+                          No DL back uploaded
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pillar 3: Vehicle Specs & Registration Compliance */}
+              <div className="pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                      3
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-900">Vehicle Details & Legal Compliance</h4>
+                      <p className="text-[11px] text-gray-500">RC, Commercial Insurance, Pollution (PUC), and Vehicle condition</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5">
+                      {selectedProvider.documents?.vehicle_type === 'bike' ? (
+                        <Bike className="w-3.5 h-3.5" />
+                      ) : selectedProvider.documents?.vehicle_type === 'van' ? (
+                        <Truck className="w-3.5 h-3.5" />
+                      ) : (
+                        <Car className="w-3.5 h-3.5" />
+                      )}
+                      {selectedProvider.documents?.vehicle_type || 'Car'}
+                    </span>
+                    {selectedProvider.documents?.registration_number && (
+                      <span className="px-2.5 py-1 bg-gray-900 text-white rounded-lg text-xs font-mono font-bold">
+                        {selectedProvider.documents.registration_number}
+                      </span>
                     )}
                   </div>
+                </div>
 
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-900 space-y-1">
-                    <p className="font-bold">Facial Audit Checklist:</p>
-                    <p>• Verify that the face on the ID matches the live selfie.</p>
-                    <p>• Verify the name on ID matches the registered host profile.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-xl mb-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Vehicle Model</span>
+                    <span className="font-bold text-gray-800">
+                      {selectedProvider.documents?.vehicle_brand || ''} {selectedProvider.documents?.vehicle_model || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Year & Fuel</span>
+                    <span className="font-bold text-gray-800">
+                      {selectedProvider.documents?.vehicle_year || '—'} • {selectedProvider.documents?.fuel_type || 'Petrol'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Seating Capacity</span>
+                    <span className="font-bold text-gray-800">
+                      {selectedProvider.documents?.seating_capacity ? `${selectedProvider.documents.seating_capacity} Persons` : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Insurance Expiry</span>
+                    <span className="font-bold text-gray-800">{selectedProvider.documents?.insurance_expiry || '—'}</span>
+                  </div>
+                </div>
+
+                {/* Vehicle Compliance Documents & Photos Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* RC */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-600 block truncate">Registration (RC)</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[120px]">
+                      {selectedProvider.documents?.rc_document ? (
+                        <img
+                          src={selectedProvider.documents.rc_document}
+                          alt="RC Document"
+                          className="w-full max-h-32 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-3 text-center text-[10px] text-gray-400">
+                          <FileText className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+                          No RC uploaded
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Insurance */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-600 block truncate">Insurance Policy</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[120px]">
+                      {selectedProvider.documents?.insurance_document ? (
+                        <img
+                          src={selectedProvider.documents.insurance_document}
+                          alt="Insurance Document"
+                          className="w-full max-h-32 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-3 text-center text-[10px] text-gray-400">
+                          <FileText className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+                          No Insurance
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Fitness / PUC */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-600 block truncate">Fitness / PUC</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[120px]">
+                      {selectedProvider.documents?.fitness_document ? (
+                        <img
+                          src={selectedProvider.documents.fitness_document}
+                          alt="Fitness/PUC"
+                          className="w-full max-h-32 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-3 text-center text-[10px] text-gray-400">
+                          <FileText className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+                          No Fitness/PUC
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Exterior Photo */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-600 block truncate">Vehicle Exterior</span>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center min-h-[120px]">
+                      {selectedProvider.documents?.vehicle_photo ? (
+                        <img
+                          src={selectedProvider.documents.vehicle_photo}
+                          alt="Vehicle Photo"
+                          className="w-full max-h-32 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="p-3 text-center text-[10px] text-gray-400">
+                          <Car className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+                          No Photo
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -8,6 +8,12 @@ import { SearchBar } from '@/components/layout/SearchBar'
 import { FilterSidebar, type FilterValues } from '@/components/listings/FilterSidebar'
 import { ListingGrid } from '@/components/listings/ListingGrid'
 import { Pagination } from '@/components/ui/Pagination'
+import { Button } from '@/components/ui/Button'
+import { PriceEstimatorModal } from '@/components/explore/PriceEstimatorModal'
+import { ListingCompareModal } from '@/components/explore/ListingCompareModal'
+import { ListingMapView } from '@/components/explore/ListingMapView'
+import { LayoutGrid, Map, Calculator, SlidersHorizontal, Scale, Sparkles, X } from 'lucide-react'
+import { SERVICE_CATEGORIES } from '@/lib/constants'
 
 function ExploreContent() {
   const searchParams = useSearchParams()
@@ -28,6 +34,14 @@ function ExploreContent() {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 9
+
+  // View Mode: Grid vs Interactive Map
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
+
+  // Modals
+  const [showEstimator, setShowEstimator] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+  const [compareList, setCompareList] = useState<any[]>([])
 
   useEffect(() => {
     // Sync filters with URL query parameters when URL changes
@@ -74,12 +88,20 @@ function ExploreContent() {
     currentPage * pageSize
   )
 
+  const handleApplyCategoryFromEstimator = (category: string) => {
+    setFilters((prev) => ({ ...prev, category }))
+  }
+
+  const handleRemoveCompare = (id: string) => {
+    setCompareList((prev) => prev.filter((item) => item.id !== id))
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50/50">
+    <div className="min-h-screen flex flex-col bg-slate-50/70">
       <Header />
 
-      {/* Top Search bar wrapper */}
-      <div className="bg-white border-b border-gray-200 py-6">
+      {/* Top Search bar wrapper with glassmorphism */}
+      <div className="bg-white border-b border-slate-200/80 py-5 sticky top-16 z-30 shadow-sm backdrop-blur-md bg-white/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SearchBar
             compact
@@ -89,6 +111,42 @@ function ExploreContent() {
             initialTime={timeParam}
             initialDuration={durationParam}
           />
+
+          {/* Quick-Filter Category Pills (1-tap Mobile & Desktop friendly) */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-3 pb-1 mt-2 border-t border-slate-100">
+            <button
+              onClick={() => setFilters((prev) => ({ ...prev, category: undefined }))}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                !filters.category
+                  ? 'bg-slate-900 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All Categories
+            </button>
+            {SERVICE_CATEGORIES.map((cat) => {
+              const isSelected = filters.category === cat.value
+              return (
+                <button
+                  key={cat.value}
+                  onClick={() =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      category: isSelected ? undefined : cat.value,
+                    }))
+                  }
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/25'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -103,37 +161,126 @@ function ExploreContent() {
             totalResults={listings.length}
           />
 
-          {/* Results Grid */}
+          {/* Results Grid / Map Area */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-xl sm:text-2xl font-black text-gray-900 font-display">
-                {filters.category
-                  ? `${filters.category.replace(/_/g, ' ').toUpperCase()} Services by the Hour`
-                  : 'All Hourly Tourism Services'}
-              </h1>
-              <span className="text-xs text-gray-500 font-semibold hidden sm:block">
-                Showing {listings.length} experiences
-              </span>
+            {/* Action Bar: Title, Fare Estimator, Grid/Map Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-display">
+                    {filters.category
+                      ? `${filters.category.replace(/_/g, ' ').toUpperCase()} by the Hour`
+                      : 'Hourly Tourism Services'}
+                  </h1>
+                  <span className="live-badge-dot" />
+                </div>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Showing <span className="font-bold text-slate-800">{listings.length}</span> verified options in{' '}
+                  <span className="font-semibold text-emerald-700">{filters.destination || 'All Active Regions'}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2.5">
+                {/* Price Estimator Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEstimator(true)}
+                  className="rounded-2xl text-xs font-bold border-orange-200 text-[#ff7a00] hover:bg-orange-50 shadow-sm"
+                >
+                  <Calculator className="w-3.5 h-3.5 mr-1.5" />
+                  Fare Estimator
+                </Button>
+
+                {/* Compare Button if items selected */}
+                {compareList.length > 0 && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowCompare(true)}
+                    className="rounded-2xl text-xs font-bold bg-gradient-to-r from-orange-500 to-amber-500"
+                  >
+                    <Scale className="w-3.5 h-3.5 mr-1.5" />
+                    Compare ({compareList.length})
+                  </Button>
+                )}
+
+                {/* View Mode Toggle: Grid vs Map */}
+                <div className="flex items-center bg-slate-200/80 p-1 rounded-2xl border border-slate-300/40">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded-xl transition-all ${
+                      viewMode === 'grid'
+                        ? 'bg-white text-slate-900 shadow-sm font-bold'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="Grid View"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('map')}
+                    className={`p-2 rounded-xl transition-all ${
+                      viewMode === 'map'
+                        ? 'bg-white text-slate-900 shadow-sm font-bold'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="Interactive Map View"
+                  >
+                    <Map className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <ListingGrid
-              listings={paginatedListings}
-              loading={loading}
-              emptyTitle="No listings available yet"
-              emptyDescription="No hourly services are available right now. Check back soon or try clearing your filters."
-            />
+            {/* Display Active View Mode */}
+            {viewMode === 'map' ? (
+              <div className="rounded-3xl overflow-hidden shadow-sm border border-slate-200">
+                <ListingMapView listings={listings} city={filters.destination || 'Coimbatore'} />
+              </div>
+            ) : (
+              <>
+                <ListingGrid
+                  listings={paginatedListings}
+                  loading={loading}
+                  emptyTitle="No listings available for this filter"
+                  emptyDescription="Try selecting another transport category or reset filters to see all available hourly listings."
+                />
 
-            {/* Pagination */}
-            <div className="mt-12">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={(p) => setCurrentPage(p)}
-              />
-            </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-12 flex justify-center">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={(p) => setCurrentPage(p)}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Price Estimator Modal */}
+      {showEstimator && (
+        <PriceEstimatorModal
+          isOpen={true}
+          onClose={() => setShowEstimator(false)}
+          onApplyCategory={handleApplyCategoryFromEstimator}
+        />
+      )}
+
+      {/* Compare Modal */}
+      {showCompare && (
+        <ListingCompareModal
+          isOpen={true}
+          onClose={() => setShowCompare(false)}
+          listings={compareList}
+          onRemove={handleRemoveCompare}
+        />
+      )}
 
       <Footer />
     </div>
@@ -142,7 +289,7 @@ function ExploreContent() {
 
 export default function ExplorePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
       <ExploreContent />
     </Suspense>
   )

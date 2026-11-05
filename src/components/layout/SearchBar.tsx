@@ -30,6 +30,26 @@ export function SearchBar({
   const [date, setDate] = useState(initialDate)
   const [time, setTime] = useState(initialTime)
   const [duration, setDuration] = useState(initialDuration)
+  const [launchedCities, setLaunchedCities] = useState<any[]>([])
+
+  React.useEffect(() => {
+    async function loadActiveCities() {
+      try {
+        const res = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          const list = data.cities || data.destinations
+          if (list && Array.isArray(list) && list.length > 0) {
+            setLaunchedCities(list)
+          }
+        }
+      } catch (err) {
+        // Fallback default
+        setLaunchedCities([{ name: 'Coimbatore' }, { name: 'Pollachi' }])
+      }
+    }
+    loadActiveCities()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,11 +87,17 @@ export function SearchBar({
             </label>
             <input
               type="text"
+              list="launched-cities"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder="e.g. Coimbatore, Isha, Pollachi"
               className="w-full bg-transparent text-sm font-semibold text-gray-900 outline-none placeholder:text-gray-400 placeholder:font-normal"
             />
+            <datalist id="launched-cities">
+              {launchedCities.map((c: any) => (
+                <option key={c.id || c.name} value={c.name} />
+              ))}
+            </datalist>
           </div>
         </div>
 
@@ -148,32 +174,115 @@ export function SearchBar({
       </div>
 
       {!compact && (
-        <div className="mt-3.5 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-          <span className="font-bold text-[11px] uppercase tracking-wider text-[#0a4d29] mr-1 flex items-center">
-            📍 Coimbatore Hubs & Escapes:
-          </span>
-          {[
-            { label: 'Isha Adiyogi (3-5 hrs)', q: 'Isha' },
-            { label: 'Marudhamalai Temple (2 hrs)', q: 'Marudhamalai' },
-            { label: 'Siruvani Waterfalls (4-6 hrs)', q: 'Siruvani' },
-            { label: 'Valparai 40 Hairpins (8-10 hrs)', q: 'Valparai' },
-            { label: 'Pollachi Countryside (5-7 hrs)', q: 'Pollachi' },
-            { label: 'Perur Chola Temple (2 hrs)', q: 'Perur' },
-            { label: 'Gedee Car Museum (2 hrs)', q: 'Gedee' },
-            { label: 'Baralikadu Coracle (6-8 hrs)', q: 'Baralikadu' },
-          ].map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={() => {
-                setDestination(chip.q)
-                router.push(`/explore?destination=${encodeURIComponent(chip.q)}`)
-              }}
-              className={`px-2.5 py-1 rounded-full bg-gray-100 hover:bg-orange-100 hover:text-orange-800 font-medium transition-colors text-[11px]`}
-            >
-              {chip.label}
-            </button>
-          ))}
+        <div className="mt-3.5 pt-3 border-t border-gray-100 space-y-2">
+          {/* Quick Region Selector Pills if multiple cities exist */}
+          {launchedCities.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1">
+                Select Destination:
+              </span>
+              {launchedCities.map((c: any) => {
+                const isSelected =
+                  destination.trim().toLowerCase() === c.name.toLowerCase() ||
+                  (destination.trim() === '' && c.name.toLowerCase() === 'coimbatore')
+                return (
+                  <button
+                    key={c.id || c.name}
+                    type="button"
+                    onClick={() => {
+                      setDestination(c.name)
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${
+                      isSelected
+                        ? 'bg-[#0a4d29] text-white shadow-sm ring-1 ring-emerald-500'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    📍 {c.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Dynamic City Hubs & Escapes */}
+          {(() => {
+            const cleanDest = destination.trim().toLowerCase()
+            const matchedCity =
+              launchedCities.find(
+                (c: any) =>
+                  c.name.toLowerCase() === cleanDest ||
+                  cleanDest.includes(c.name.toLowerCase()) ||
+                  c.name.toLowerCase().includes(cleanDest)
+              ) || launchedCities[0]
+
+            const cityName = matchedCity?.name || 'Coimbatore'
+
+            // Generate chips from top_spots and hidden_spots, or fallback curated spots
+            let chips: { label: string; q: string }[] = []
+
+            if (matchedCity?.top_spots?.length || matchedCity?.hidden_spots?.length) {
+              const spots = [
+                ...(matchedCity.top_spots || []),
+                ...(matchedCity.hidden_spots || []),
+              ]
+              chips = spots.slice(0, 8).map((s: any) => ({
+                label: `${s.name}${s.recommended_hours ? ` (${s.recommended_hours})` : ''}`,
+                q: s.name,
+              }))
+            } else if (cityName.toLowerCase() === 'pollachi') {
+              chips = [
+                { label: 'Aliyar Dam & Gardens (3-4 hrs)', q: 'Aliyar' },
+                { label: 'Monkey Falls (2-3 hrs)', q: 'Monkey Falls' },
+                { label: 'Topslip Elephant Safari (5-6 hrs)', q: 'Topslip' },
+                { label: 'Valparai 40 Hairpins (8-10 hrs)', q: 'Valparai' },
+                { label: 'Masani Amman Temple (2 hrs)', q: 'Masani Amman' },
+                { label: 'Thirumoorthy Falls (4-5 hrs)', q: 'Thirumoorthy' },
+              ]
+            } else if (cityName.toLowerCase().includes('ooty')) {
+              chips = [
+                { label: 'Doddabetta Peak (2-3 hrs)', q: 'Doddabetta' },
+                { label: 'Pykara Lake & Falls (4-5 hrs)', q: 'Pykara' },
+                { label: 'Botanical Gardens (2 hrs)', q: 'Botanical Gardens' },
+                { label: 'Emerald Lake & Avalanche (5-6 hrs)', q: 'Emerald Lake' },
+                { label: 'Rose Garden Elk Hill (2 hrs)', q: 'Rose Garden' },
+                { label: 'Coonoor Tea Estates (4-6 hrs)', q: 'Coonoor' },
+              ]
+            } else {
+              // Default Coimbatore chips
+              chips = [
+                { label: 'Isha Adiyogi (3-5 hrs)', q: 'Isha' },
+                { label: 'Marudhamalai Temple (2 hrs)', q: 'Marudhamalai' },
+                { label: 'Siruvani Waterfalls (4-6 hrs)', q: 'Siruvani' },
+                { label: 'Valparai 40 Hairpins (8-10 hrs)', q: 'Valparai' },
+                { label: 'Pollachi Countryside (5-7 hrs)', q: 'Pollachi' },
+                { label: 'Perur Chola Temple (2 hrs)', q: 'Perur' },
+                { label: 'Gedee Car Museum (2 hrs)', q: 'Gedee' },
+                { label: 'Baralikadu Coracle (6-8 hrs)', q: 'Baralikadu' },
+              ]
+            }
+
+            return (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 pt-1">
+                <span className="font-bold text-[11px] uppercase tracking-wider text-[#0a4d29] mr-1 flex items-center">
+                  📍 {cityName} Hubs & Escapes:
+                </span>
+                {chips.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => {
+                      setDestination(chip.q)
+                      router.push(`/explore?destination=${encodeURIComponent(chip.q)}`)
+                    }}
+                    className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-orange-100 hover:text-orange-800 font-medium transition-colors text-[11px]"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       )}
     </form>

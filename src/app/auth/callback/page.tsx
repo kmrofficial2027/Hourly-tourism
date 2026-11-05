@@ -58,10 +58,20 @@ function AuthCallbackContent() {
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
           if (exchangeError) {
-            // Check if concurrent background exchange succeeded
-            const { data: retrySession } = await supabase.auth.getSession()
-            if (retrySession?.session?.user) {
-              authUser = retrySession.session.user
+            // In Next.js client, supabase-js detectSessionInUrl may concurrently exchange the code in the background.
+            // Poll getSession() across multiple intervals to allow background exchange to complete.
+            let foundUser = null
+            for (let i = 0; i < 5; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 400 + i * 200))
+              const { data: retrySession } = await supabase.auth.getSession()
+              if (retrySession?.session?.user) {
+                foundUser = retrySession.session.user
+                break
+              }
+            }
+
+            if (foundUser) {
+              authUser = foundUser
             } else {
               console.error('Client exchangeCodeForSession error:', exchangeError)
               window.location.replace(`/login?error=${encodeURIComponent(exchangeError.message)}`)
@@ -108,7 +118,6 @@ function AuthCallbackContent() {
         let target = '/dashboard'
         if (resolvedRole === 'admin') target = '/admin'
         else if (resolvedRole === 'provider') target = '/provider'
-        else if (resolvedRole === 'company') target = '/company'
 
         // Only apply storedRedirect if it's a specific route matching the user's portal
         if (
@@ -117,8 +126,6 @@ function AuthCallbackContent() {
           !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(storedRedirect)
         ) {
           if (resolvedRole === 'provider' && storedRedirect.startsWith('/provider')) {
-            target = storedRedirect
-          } else if (resolvedRole === 'company' && storedRedirect.startsWith('/company')) {
             target = storedRedirect
           } else if (resolvedRole === 'customer' && storedRedirect.startsWith('/dashboard')) {
             target = storedRedirect

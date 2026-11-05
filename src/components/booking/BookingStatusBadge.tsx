@@ -110,6 +110,48 @@ export function BookingStatusBadge({ status, className = '' }: BookingStatusBadg
       text: 'text-indigo-900',
       dot: 'bg-indigo-600',
     },
+    provider_assigned: {
+      label: 'Host / Driver Assigned',
+      bg: 'bg-cyan-50 border-cyan-200',
+      text: 'text-cyan-800',
+      dot: 'bg-cyan-500',
+    },
+    driver_on_the_way: {
+      label: 'Driver On The Way',
+      bg: 'bg-sky-50 border-sky-200',
+      text: 'text-sky-800',
+      dot: 'bg-sky-500 animate-pulse',
+    },
+    trip_started: {
+      label: 'Trip Started',
+      bg: 'bg-purple-50 border-purple-200',
+      text: 'text-purple-800',
+      dot: 'bg-purple-500 animate-pulse',
+    },
+    no_show: {
+      label: 'Marked No-Show',
+      bg: 'bg-rose-50 border-rose-200',
+      text: 'text-rose-800',
+      dot: 'bg-rose-500',
+    },
+    expired: {
+      label: 'Request Expired',
+      bg: 'bg-stone-100 border-stone-200',
+      text: 'text-stone-700',
+      dot: 'bg-stone-400',
+    },
+    refund_completed: {
+      label: 'Refund Completed',
+      bg: 'bg-emerald-50 border-emerald-200',
+      text: 'text-emerald-800',
+      dot: 'bg-emerald-500',
+    },
+    disputed: {
+      label: 'Under Dispute',
+      bg: 'bg-orange-50 border-orange-200',
+      text: 'text-orange-900',
+      dot: 'bg-orange-500 animate-pulse',
+    },
   }
 
   const current = statusStyles[status] || {

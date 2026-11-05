@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const targetRole = providerType === 'company' ? 'company' : 'provider'
+    const targetRole = 'provider'
     const adminSupabase = await createAdminSupabaseClient()
 
     // 1. Update user profile role using adminSupabase (bypassing client RLS recursion)
@@ -48,31 +48,17 @@ export async function POST(request: Request) {
       },
     })
 
-    // 3. Upsert provider or company record using adminSupabase
-    if (providerType === 'company') {
-      await adminSupabase.from('company_profiles').upsert(
-        {
-          user_id: user.id,
-          company_name: businessName || 'Company Fleet',
-          city,
-          phone,
-          description,
-          verification_status: 'approved',
-        },
-        { onConflict: 'user_id' }
-      )
-    } else {
-      await adminSupabase.from('provider_profiles').upsert(
-        {
-          user_id: user.id,
-          business_name: businessName || 'Independent Host',
-          city,
-          description,
-          verification_status: 'pending',
-        },
-        { onConflict: 'user_id' }
-      )
-    }
+    // 3. Upsert provider record using adminSupabase
+    await adminSupabase.from('provider_profiles').upsert(
+      {
+        user_id: user.id,
+        business_name: businessName || 'Independent Host',
+        city,
+        description,
+        verification_status: 'pending',
+      },
+      { onConflict: 'user_id' }
+    )
 
     return NextResponse.json({
       success: true,

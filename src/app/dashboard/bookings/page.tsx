@@ -407,6 +407,13 @@ support@hourlytourism.com
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      {/* View Details Link */}
+                      <Link href={`/dashboard/bookings/${booking.id}`}>
+                        <Button variant="outline" size="sm" className="font-bold border-emerald-200 text-[#0a4d29]">
+                          Details & Timeline
+                        </Button>
+                      </Link>
+
                       {/* Pay Button if pending */}
                       {canPay && (
                         <Button

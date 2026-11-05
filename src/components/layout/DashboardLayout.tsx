@@ -22,16 +22,44 @@ import {
   Bell,
   ChevronRight,
   TrendingUp,
+  MapPin,
+  Car,
+  ShieldAlert,
+  HelpCircle,
+  Layers,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
 import { Logo } from '@/components/ui/Logo'
+import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 
 export interface DashboardLayoutProps {
   children: React.ReactNode
-  role?: 'customer' | 'provider' | 'company' | 'admin'
+  role?: 'customer' | 'provider' | 'admin'
   title?: string
 }
+
+// Role badge colors
+const roleBadgeMap: Record<string, string> = {
+  customer: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  provider: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  admin: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+}
+
+// Icon accent colors per nav item (by index, cycling)
+const iconColors = [
+  'text-emerald-400',
+  'text-sky-400',
+  'text-amber-400',
+  'text-violet-400',
+  'text-rose-400',
+  'text-teal-400',
+  'text-orange-400',
+  'text-indigo-400',
+  'text-pink-400',
+  'text-lime-400',
+  'text-cyan-400',
+]
 
 export function DashboardLayout({
   children,
@@ -48,9 +76,7 @@ export function DashboardLayout({
     if (!loading && profile?.role) {
       if (profile.role === 'provider' && role === 'customer') {
         window.location.replace('/provider')
-      } else if (profile.role === 'company' && role === 'customer') {
-        window.location.replace('/company')
-      } else if (profile.role === 'customer' && (role === 'provider' || role === 'company')) {
+      } else if (profile.role === 'customer' && role === 'provider') {
         window.location.replace('/dashboard')
       }
     }
@@ -63,31 +89,30 @@ export function DashboardLayout({
       { label: 'My Bookings', href: '/dashboard/bookings', icon: Calendar },
       { label: 'Reviews & Ratings', href: '/dashboard/reviews', icon: Star },
       { label: 'Profile Settings', href: '/dashboard/profile', icon: User },
+      { label: 'Support & Help', href: '/dashboard/support', icon: HelpCircle },
     ],
     provider: [
       { label: 'Overview', href: '/provider', icon: LayoutDashboard },
       { label: 'My Listings', href: '/provider/listings', icon: Compass },
       { label: 'Bookings & Requests', href: '/provider/bookings', icon: Calendar },
-      { label: 'Earnings & Payouts', href: '/provider/earnings', icon: TrendingUp },
+      { label: 'Payments & Payouts', href: '/provider/earnings', icon: CreditCard },
       { label: 'Availability & Hours', href: '/provider/availability', icon: Clock },
-      { label: 'Verification', href: '/provider/verification', icon: ShieldCheck },
+      { label: 'Verifications', href: '/provider/verification', icon: ShieldCheck },
       { label: 'Reviews', href: '/provider/reviews', icon: Star },
       { label: 'Provider Profile', href: '/provider/profile', icon: User },
-    ],
-    company: [
-      { label: 'Overview', href: '/company', icon: LayoutDashboard },
-      { label: 'Fleet & Services', href: '/company/services', icon: Briefcase },
-      { label: 'All Bookings', href: '/company/bookings', icon: Calendar },
-      { label: 'Revenue & Reports', href: '/company/revenue', icon: CreditCard },
-      { label: 'Company Profile', href: '/company/profile', icon: Building2 },
+      { label: 'Support & Help', href: '/provider/support', icon: HelpCircle },
     ],
     admin: [
       { label: 'Overview', href: '/admin', icon: LayoutDashboard },
+      { label: 'Marketplace Analytics', href: '/admin/analytics', icon: TrendingUp },
+      { label: 'Destinations & Cities', href: '/admin/destinations', icon: MapPin },
+      { label: 'Footer & Category Pages', href: '/admin/footer-pages', icon: Layers },
       { label: 'Customers', href: '/admin/customers', icon: Users },
-      { label: 'Providers', href: '/admin/providers', icon: Briefcase },
-      { label: 'Listings Approval', href: '/admin/listings', icon: Compass },
+      { label: 'Providers & Verifications', href: '/admin/providers', icon: ShieldCheck },
+      { label: 'Listings Moderation', href: '/admin/listings', icon: Compass },
       { label: 'Bookings Monitor', href: '/admin/bookings', icon: Calendar },
       { label: 'Payments & Revenue', href: '/admin/payments', icon: CreditCard },
+      { label: 'Disputes & Support', href: '/admin/disputes', icon: ShieldAlert },
       { label: 'Reviews Moderation', href: '/admin/reviews', icon: Star },
       { label: 'Platform Settings', href: '/admin/settings', icon: Settings },
     ],
@@ -95,137 +120,242 @@ export function DashboardLayout({
 
   const currentNav = navConfigs[role] || navConfigs.customer
 
+  // Bottom tab bar items (5 primary — first 4 from nav + profile)
+  const bottomTabs = [
+    ...(currentNav.slice(0, 4)),
+    { label: 'Profile', href: currentNav.find(n => n.href.includes('profile'))?.href || '/dashboard/profile', icon: User },
+  ]
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'My Account'
+  const initials = displayName
+    .split(' ')
+    .slice(0, 2)
+    .map((w: string) => w[0])
+    .join('')
+    .toUpperCase()
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Sidebar Overlay */}
+    <div className="min-h-screen bg-[#f8fafc] flex">
+      {/* ── Mobile Sidebar Overlay ─────────────────────────────────────── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* ── SIDEBAR ───────────────────────────────────────────────────── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#0f172a] transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col shadow-2xl shadow-black/40 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand / Logo */}
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-5 flex items-center justify-between border-b border-white/5">
           <div className="flex flex-col">
+            {/* Logo rendered on dark bg */}
             <Logo variant="compact" />
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#ff7a00] mt-1 pl-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#ff7a00] mt-1 pl-0.5">
               {role} Portal
             </span>
           </div>
-
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-1 rounded-lg text-gray-400 hover:text-gray-600 lg:hidden"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 lg:hidden transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* User Card in Sidebar */}
-        <div className="p-4 mx-4 my-3 rounded-2xl bg-green-50/70 border border-green-200/60 flex items-center space-x-3">
-          <Avatar
-            src={profile?.avatar_url}
-            name={profile?.full_name || user?.email}
-            size="md"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">
-              {profile?.full_name || 'My Account'}
-            </p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+        {/* ── User Card ── */}
+        <div className="mx-4 mt-4 mb-2 p-4 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm relative overflow-hidden">
+          {/* Subtle glow */}
+          <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-[#ff7a00]/20 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="relative">
+              <Avatar
+                src={profile?.avatar_url}
+                name={profile?.full_name || user?.email}
+                size="md"
+              />
+              {/* Online indicator */}
+              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0f172a]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-white truncate">
+                {displayName}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
+              <span
+                className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+                  roleBadgeMap[role] || roleBadgeMap.customer
+                }`}
+              >
+                {role}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Navigation links */}
-        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
-          {currentNav.map((item) => {
-            const isActive = pathname === item.href
+        {/* ── Navigation Links ── */}
+        <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+          {currentNav.map((item, idx) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/dashboard' &&
+                item.href !== '/provider' &&
+                item.href !== '/admin' &&
+                pathname.startsWith(item.href))
             const Icon = item.icon
+            const iconColor = iconColors[idx % iconColors.length]
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 prefetch={true}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                onClick={() => setSidebarOpen(false)}
+                className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group ${
                   isActive
-                    ? 'bg-gradient-to-r from-[#ff7a00] to-[#f59e0b] text-white shadow-md shadow-orange-500/25'
-                    : 'text-gray-600 hover:text-[#0a4d29] hover:bg-green-50/60'
+                    ? 'bg-gradient-to-r from-[#ff7a00] to-[#f59e0b] text-white shadow-lg shadow-orange-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-white/8'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-[#15803d]'}`} />
+                {/* Active left-edge pill indicator */}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-white/60" />
+                )}
+
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-5 h-5 flex-shrink-0 ${
+                      isActive ? 'text-white' : iconColor
+                    }`}
+                  />
                   <span>{item.label}</span>
                 </div>
-                {isActive && <ChevronRight className="w-4 h-4 text-orange-200" />}
+                {isActive && (
+                  <ChevronRight className="w-4 h-4 text-orange-200 flex-shrink-0" />
+                )}
               </Link>
             )
           })}
         </nav>
 
-        {/* Bottom Actions */}
-        <div className="p-4 border-t border-gray-100 space-y-2">
+        {/* ── Bottom Actions ── */}
+        <div className="p-4 border-t border-white/5 space-y-1">
           <Link
             href="/"
-            className="flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/8 transition-all"
           >
-            <Compass className="w-4 h-4 mr-2.5 text-gray-400" />
+            <Compass className="w-4 h-4 text-slate-500" />
             Back to Marketplace
           </Link>
           <button
             onClick={() => signOut()}
-            className="w-full flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
           >
-            <LogOut className="w-4 h-4 mr-2.5 text-red-400" />
+            <LogOut className="w-4 h-4" />
             Sign Out
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* ── MAIN CONTENT AREA ──────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header bar */}
-        <header className="h-16 sm:h-18 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
-          <div className="flex items-center space-x-3">
+        {/* ── Top Header Bar ── */}
+        <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm">
+          {/* Left: hamburger + title */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 lg:hidden"
+              className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 lg:hidden transition-colors"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="lg:hidden flex items-center">
+            <div className="lg:hidden">
               <Logo variant="compact" />
             </div>
-            <h1 className="hidden sm:block text-lg sm:text-xl font-bold text-gray-900 truncate">
-              {title || 'Dashboard'}
-            </h1>
+            {/* Page title — desktop */}
+            <div className="hidden lg:flex items-center gap-2">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#ff7a00] to-[#f59e0b]" />
+              <h1 className="text-lg font-black text-gray-900 tracking-tight">
+                {title || 'Dashboard'}
+              </h1>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/dashboard?tab=notifications"
-              className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              aria-label="Notifications"
-            >
-              <Bell className="w-5 h-5" />
-            </Link>
-            <div className="h-6 w-px bg-gray-200" />
-            <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-orange-50 text-[#ff7a00] border border-orange-200/60">
+          {/* Right: notifications + role badge */}
+          <div className="flex items-center gap-3">
+            {/* NotificationCenter already has its own bell + unread dot */}
+            <NotificationCenter role={role} />
+
+            <div className="h-5 w-px bg-gray-200" />
+
+            {/* Role badge */}
+            <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-50 text-[#ff7a00] border border-orange-200/60">
               {role}
             </span>
+
+            {/* Avatar (desktop shortcut) */}
+            <div className="hidden sm:block">
+              <Avatar
+                src={profile?.avatar_url}
+                name={profile?.full_name || user?.email}
+                size="sm"
+              />
+            </div>
           </div>
         </header>
 
-        {/* Main Body */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto">{children}</main>
+        {/* ── Main Body ── */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          {children}
+        </main>
+
+        {/* ── MOBILE BOTTOM TAB BAR ──────────────────────────────────── */}
+        <nav className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-xl shadow-black/10">
+          <div className="flex items-center justify-around px-2 py-2 safe-area-pb">
+            {bottomTabs.slice(0, 5).map((item, idx) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href !== '/dashboard' &&
+                  item.href !== '/provider' &&
+                  item.href !== '/admin' &&
+                  pathname.startsWith(item.href))
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200 group min-w-0"
+                >
+                  <div
+                    className={`p-1.5 rounded-xl transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-[#ff7a00] to-[#f59e0b] shadow-md shadow-orange-500/30'
+                        : 'group-hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon
+                      className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                        isActive ? 'text-white' : 'text-gray-400'
+                      }`}
+                    />
+                  </div>
+                  <span
+                    className={`text-[9px] font-bold truncate transition-colors max-w-[52px] text-center ${
+                      isActive ? 'text-[#ff7a00]' : 'text-gray-400'
+                    }`}
+                  >
+                    {item.label.split(' ')[0]}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   )
 }
-

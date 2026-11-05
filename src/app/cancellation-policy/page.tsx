@@ -50,7 +50,7 @@ export default function CancellationPolicyPage() {
           <section className="space-y-2">
             <h2 className="text-lg font-bold text-gray-900">2. Provider-Initiated Cancellations</h2>
             <p>
-              If an independent host or company cancels your booking due to unforeseen vehicle
+              If a host or provider cancels your booking due to unforeseen vehicle
               breakdown, illness, or severe weather conditions:
             </p>
             <ul className="list-disc pl-5 space-y-1.5">

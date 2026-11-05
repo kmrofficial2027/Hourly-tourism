@@ -8,7 +8,6 @@ import {
   Lock,
   ArrowRight,
   Shield,
-  Building2,
   User,
   Compass,
   Sparkles,
@@ -47,7 +46,7 @@ function GoogleIcon({ className = 'w-5 h-5' }: { className?: string }) {
   )
 }
 
-type PublicRole = 'customer' | 'provider' | 'company'
+type PublicRole = 'customer' | 'provider'
 
 const roleConfigs: Record<
   PublicRole,
@@ -82,16 +81,6 @@ const roleConfigs: Record<
     bgLight: 'bg-orange-50/70',
     borderColor: 'border-orange-200',
   },
-  company: {
-    title: 'Company Operator Sign In',
-    subtitle: 'Manage commercial fleets, multiple drivers, and branch revenue.',
-    badge: 'Company Portal',
-    targetUrl: '/company',
-    icon: Building2,
-    color: 'text-blue-700',
-    bgLight: 'bg-blue-50/70',
-    borderColor: 'border-blue-200',
-  },
 }
 
 function LoginForm() {
@@ -102,7 +91,7 @@ function LoginForm() {
 
   const { user, profile, signIn, signInWithGoogle, loading: authLoading } = useAuth()
 
-  // Selected Login Mode (Customer, Provider, Company)
+  // Selected Login Mode (Customer or Provider)
   const [selectedRole, setSelectedRole] = useState<PublicRole>(
     initialRoleParam && roleConfigs[initialRoleParam] ? initialRoleParam : 'customer'
   )
@@ -140,7 +129,6 @@ function LoginForm() {
       let dest = '/dashboard'
       if (effectiveRole === 'admin') dest = '/admin'
       else if (effectiveRole === 'provider') dest = '/provider'
-      else if (effectiveRole === 'company') dest = '/company'
 
       let target = dest
       if (
@@ -149,7 +137,6 @@ function LoginForm() {
         !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
       ) {
         if (effectiveRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
-        else if (effectiveRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
         else if (effectiveRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
         else if (effectiveRole === 'admin') target = redirectPath
       }
@@ -200,29 +187,9 @@ function LoginForm() {
                 'Account already exists in Tourist Portal. Please sign in to the Tourist Portal or create a new account with a different email for Provider.'
               )
             }
-            if (checkData.registeredRole === 'customer' && selectedRole === 'company') {
-              throw new Error(
-                'Account already exists in Tourist Portal. Please sign in to the Tourist Portal or create a new account with a different email for Company.'
-              )
-            }
             if (checkData.registeredRole === 'provider' && selectedRole === 'customer') {
               throw new Error(
                 'This account is registered as an Independent Provider. Please switch to the Provider Portal tab to sign in.'
-              )
-            }
-            if (checkData.registeredRole === 'company' && selectedRole === 'customer') {
-              throw new Error(
-                'This account is registered as a Company Operator. Please switch to the Company Portal tab to sign in.'
-              )
-            }
-            if (checkData.registeredRole === 'provider' && selectedRole === 'company') {
-              throw new Error(
-                'This account is registered as an Independent Provider. Please switch to the Provider Portal tab to sign in.'
-              )
-            }
-            if (checkData.registeredRole === 'company' && selectedRole === 'provider') {
-              throw new Error(
-                'This account is registered as a Company Operator. Please switch to the Company Portal tab to sign in.'
               )
             }
           }
@@ -262,7 +229,6 @@ function LoginForm() {
         !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
       ) {
         if (selectedRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
-        else if (selectedRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
         else if (selectedRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
       }
 
@@ -288,7 +254,6 @@ function LoginForm() {
         !['/login', '/signup', '/null', '/undefined', '/dashboard'].includes(redirectPath)
       ) {
         if (selectedRole === 'provider' && redirectPath.startsWith('/provider')) target = redirectPath
-        else if (selectedRole === 'company' && redirectPath.startsWith('/company')) target = redirectPath
         else if (selectedRole === 'customer' && redirectPath.startsWith('/dashboard')) target = redirectPath
       }
       const res = await signInWithGoogle(selectedRole, target)
@@ -314,19 +279,6 @@ function LoginForm() {
     }
   }
 
-  // 1-Click Demo Credentials
-  const fillDemoCredentials = (role: PublicRole) => {
-    setSelectedRole(role)
-    const demoAccounts: Record<PublicRole, { email: string; pass: string }> = {
-      customer: { email: 'tourist.demo@hourlytourism.com', pass: 'Tourist@123' },
-      provider: { email: 'kovai.riders@hourlytourism.com', pass: 'Provider@123' },
-      company: { email: 'kongu.fleet@hourlytourism.com', pass: 'Company@123' },
-    }
-    setEmail(demoAccounts[role].email)
-    setPassword(demoAccounts[role].pass)
-    showToast.success(`Prefilled ${roleConfigs[role].badge} credentials`)
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-gray-50/50">
       <Header />
@@ -348,41 +300,29 @@ function LoginForm() {
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 text-center">
               Select Your Portal Login Mode
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-2xl">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl">
               <button
                 type="button"
                 onClick={() => setSelectedRole('customer')}
-                className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex flex-col items-center space-y-1 ${
+                className={`py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${
                   selectedRole === 'customer'
                     ? 'bg-white text-[#0a4d29] shadow-sm ring-1 ring-black/5'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <span>🧳 Tourist</span>
+                <span>🧳 Tourist Portal</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setSelectedRole('provider')}
-                className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex flex-col items-center space-y-1 ${
+                className={`py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${
                   selectedRole === 'provider'
                     ? 'bg-white text-[#ff7a00] shadow-sm ring-1 ring-black/5'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <span>🏍️ Provider</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRole('company')}
-                className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex flex-col items-center space-y-1 ${
-                  selectedRole === 'company'
-                    ? 'bg-white text-blue-700 shadow-sm ring-1 ring-black/5'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <span>🏢 Company</span>
+                <span>🏍️ Provider Portal</span>
               </button>
             </div>
           </div>
@@ -515,28 +455,6 @@ function LoginForm() {
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </form>
-
-          {/* 1-Click Quick Demo Helper */}
-          <div className="mt-6 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center">
-                <Sparkles className="w-3.5 h-3.5 mr-1 text-[#ff7a00]" />
-                Demo 1-Click Fill:
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(['customer', 'provider', 'company'] as PublicRole[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => fillDemoCredentials(r)}
-                  className="px-2 py-1.5 rounded-xl bg-gray-50 hover:bg-orange-50 border border-gray-200 hover:border-orange-200 text-[11px] font-semibold text-gray-700 capitalize transition-all"
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Sign Up Link */}
           <div className="mt-6 pt-4 border-t border-gray-100 text-center">

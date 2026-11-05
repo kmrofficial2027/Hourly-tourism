@@ -77,7 +77,13 @@ export async function updateSession(request: NextRequest) {
 
     const isLoginPage = request.nextUrl.pathname === '/admin/login' || request.nextUrl.pathname === '/login'
     const isSignupPage = request.nextUrl.pathname === '/signup'
-    const protectedPaths = ['/dashboard', '/provider', '/company', '/admin']
+
+    // If any legacy /company link is requested, redirect directly to /provider
+    if (request.nextUrl.pathname.startsWith('/company')) {
+      return NextResponse.redirect(new URL('/provider', request.url))
+    }
+
+    const protectedPaths = ['/dashboard', '/provider', '/admin']
     const isProtectedRoute = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path)) && !isLoginPage
 
     // 1. If unauthenticated user tries to access protected portal, redirect to login
@@ -99,6 +105,17 @@ export async function updateSession(request: NextRequest) {
         if (profData?.[0]?.role) {
           userRole = profData[0].role
         }
+
+        // If not already verified as admin, check if user is a registered provider
+        if (userRole !== 'admin') {
+          const provRes = await fetch(`${url}/rest/v1/provider_profiles?user_id=eq.${user.id}&select=id`, {
+            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+          })
+          const provData = await provRes.json()
+          if (provData?.[0]?.id) {
+            userRole = 'provider'
+          }
+        }
       } catch { }
     }
 
@@ -107,7 +124,6 @@ export async function updateSession(request: NextRequest) {
       let dest = '/dashboard'
       if (userRole === 'admin') dest = '/admin'
       else if (userRole === 'provider') dest = '/provider'
-      else if (userRole === 'company') dest = '/company'
 
       return NextResponse.redirect(new URL(dest, request.url))
     }
@@ -116,7 +132,6 @@ export async function updateSession(request: NextRequest) {
     if (user) {
       const isDashboardPath = request.nextUrl.pathname.startsWith('/dashboard')
       const isProviderPath = request.nextUrl.pathname.startsWith('/provider')
-      const isCompanyPath = request.nextUrl.pathname.startsWith('/company')
       const isAdminPath = request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin/login'
 
       // 3.1. Providers visiting customer portal (/dashboard) -> redirect to Provider Portal
@@ -124,27 +139,15 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(new URL('/provider', request.url))
       }
 
-      // 3.2. Companies visiting customer portal (/dashboard) -> redirect to Company Portal
-      if (isDashboardPath && userRole === 'company') {
-        return NextResponse.redirect(new URL('/company', request.url))
-      }
-
-      // 3.3. Customers visiting Provider portal -> redirect to Customer Dashboard
+      // 3.2. Customers visiting Provider portal -> redirect to Customer Dashboard
       if (isProviderPath && userRole === 'customer') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
 
-      // 3.4. Customers or Providers visiting Company portal -> redirect to their own portal
-      if (isCompanyPath && userRole !== 'company' && userRole !== 'admin') {
-        const target = userRole === 'provider' ? '/provider' : '/dashboard'
-        return NextResponse.redirect(new URL(target, request.url))
-      }
-
-      // 3.5. Non-admins visiting Admin portal -> redirect to their own portal
+      // 3.3. Non-admins visiting Admin portal -> redirect to their own portal
       if (isAdminPath && userRole !== 'admin') {
         let dest = '/dashboard'
         if (userRole === 'provider') dest = '/provider'
-        else if (userRole === 'company') dest = '/company'
         return NextResponse.redirect(new URL(dest, request.url))
       }
     }

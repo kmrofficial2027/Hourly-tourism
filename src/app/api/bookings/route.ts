@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 import { generateBookingNumber } from '@/lib/utils'
+import { DEFAULT_DESTINATIONS } from '@/lib/destinations'
 
 export async function POST(request: Request) {
   try {
@@ -62,12 +63,43 @@ export async function POST(request: Request) {
 
     const adminSupabase = await createAdminSupabaseClient()
 
-    // Get listing to retrieve provider_id or company_id
+    // Get listing to retrieve provider_id, company_id, city, and status
     const { data: listing } = await adminSupabase
       .from('service_listings')
-      .select('provider_id, company_id')
+      .select('provider_id, company_id, destination_city, status')
       .eq('id', listingId)
       .single()
+
+    if (!listing || listing.status !== 'active') {
+      return NextResponse.json(
+        { error: 'This tour is currently inactive or not available for booking.' },
+        { status: 400 }
+      )
+    }
+
+    if (listing.destination_city) {
+      const { data: destSetting } = await adminSupabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'city_destinations')
+        .maybeSingle()
+
+      const allDestinations =
+        destSetting?.value && Array.isArray(destSetting.value)
+          ? destSetting.value
+          : DEFAULT_DESTINATIONS
+
+      const cityMatch = allDestinations.find(
+        (d: any) => d.name.toLowerCase() === listing.destination_city.trim().toLowerCase()
+      )
+
+      if (cityMatch && !cityMatch.is_active) {
+        return NextResponse.json(
+          { error: `The city "${listing.destination_city}" is currently disabled by platform administrator and cannot accept new bookings.` },
+          { status: 400 }
+        )
+      }
+    }
 
     const bookingNumber = generateBookingNumber()
 

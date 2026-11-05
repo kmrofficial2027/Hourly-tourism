@@ -229,6 +229,12 @@ export default function ProviderBookingsPage() {
 
                     {/* Status and QR Collection Actions */}
                     <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/provider/bookings/${b.id}`}>
+                        <Button variant="outline" size="sm" className="font-bold border-orange-200 text-[#ff7a00]">
+                          Manage & Details
+                        </Button>
+                      </Link>
+
                       {b.status === 'pending' && (
                         <>
                           <Button

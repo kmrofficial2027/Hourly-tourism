@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server'
+import { normalizeListingImages } from '@/lib/utils'
+import { DEFAULT_DESTINATIONS } from '@/lib/destinations'
 
 export async function GET(request: Request) {
   try {
@@ -12,11 +14,47 @@ export async function GET(request: Request) {
     const maxPrice = searchParams.get('maxPrice')
     const minRating = searchParams.get('minRating')
     const sortBy = searchParams.get('sortBy')
+    const scope = searchParams.get('scope') // 'admin' | 'provider' | null
+    const all = searchParams.get('all') === 'true'
 
-    let query = supabase
+    const adminSupabase = await createAdminSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    let query = adminSupabase
       .from('service_listings')
-      .select('*, provider:provider_id(business_name), company:company_id(company_name)')
-      .eq('status', 'active')
+      .select('*, vehicle_details(*), hourly_packages(*), provider:provider_id(id, business_name, user_id)')
+
+    if (scope === 'admin' || all) {
+      // Admin sees everything; verify admin role if user logged in
+      if (user) {
+        const { data: profile } = await adminSupabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+        if (profile?.role === 'admin') {
+          // Allow unrestricted access
+        } else {
+          // Non-admin fall back to active
+          query = query.eq('status', 'active')
+        }
+      } else {
+        query = query.eq('status', 'active')
+      }
+    } else if (scope === 'provider' && user) {
+      // Find provider profile ID
+      const { data: prov } = await adminSupabase.from('provider_profiles').select('id').eq('user_id', user.id).maybeSingle()
+      const { data: comp } = await adminSupabase.from('company_profiles').select('id').eq('user_id', user.id).maybeSingle()
+      
+      if (prov) {
+        query = query.eq('provider_id', prov.id)
+      } else if (comp) {
+        query = query.eq('company_id', comp.id)
+      } else {
+        return NextResponse.json({ listings: [] })
+      }
+    } else {
+      // Public view: only active listings
+      query = query.eq('status', 'active')
+    }
 
     if (category) {
       query = query.eq('category', category)
@@ -51,10 +89,44 @@ export async function GET(request: Request) {
     const { data: listings, error } = await query
 
     if (error) {
+      console.error('Listings query error:', error)
       return NextResponse.json({ listings: [] })
     }
 
-    return NextResponse.json({ listings })
+    const now = new Date()
+
+    let normalizedListings = (listings || []).map((l: any) => {
+      let metadata: any = {}
+      try {
+        if (l.terms_and_conditions && l.terms_and_conditions.startsWith('{')) {
+          metadata = JSON.parse(l.terms_and_conditions)
+        }
+      } catch (e) {}
+
+      const activeUntil = metadata.active_until || null
+      const isExpired = activeUntil ? new Date(activeUntil) < now : false
+
+      return {
+        ...l,
+        planned_spots: metadata.planned_spots || [],
+        unseen_spots: metadata.unseen_spots || [],
+        hidden_spots: metadata.hidden_spots || [],
+        active_from: metadata.active_from || l.created_at,
+        active_until: activeUntil,
+        is_timed: Boolean(metadata.is_timed && activeUntil),
+        is_expired: isExpired,
+        rejection_reason: metadata.rejection_reason || l.rejection_reason || null,
+        rejected_at: metadata.rejected_at || l.rejected_at || null,
+        images: normalizeListingImages(l.images, l.category),
+      }
+    })
+
+    // If public browsing (not provider scope and not admin scope), filter out expired listings
+    if (scope !== 'provider' && scope !== 'admin' && !all) {
+      normalizedListings = normalizedListings.filter((l: any) => !l.is_expired)
+    }
+
+    return NextResponse.json({ listings: normalizedListings })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -97,6 +169,12 @@ export async function POST(request: Request) {
       vehicleDetails, // { vehicle_type: 'bike' | 'car' | 'van', brand, model, year, passenger_capacity, fuel_type, features }
       guideDetails, // { languages, specializations, experience_years, max_group_size }
       packages = [], // array of { name, duration_hours, price, description }
+      plannedSpots = [],
+      unseenSpots = [],
+      hiddenSpots = [],
+      activeFrom,
+      activeUntil,
+      isTimed = false,
     } = body
 
     // Strict validation: Transport category restriction
@@ -119,6 +197,33 @@ export async function POST(request: Request) {
     }
 
     const adminSupabase = await createAdminSupabaseClient()
+
+    // Validate that operating city is active and not disabled by admin
+    if (destinationCity) {
+      const { data: destSetting } = await adminSupabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'city_destinations')
+        .maybeSingle()
+
+      const allDestinations =
+        destSetting?.value && Array.isArray(destSetting.value)
+          ? destSetting.value
+          : DEFAULT_DESTINATIONS
+
+      const cityMatch = allDestinations.find(
+        (d: any) => d.name.toLowerCase() === destinationCity.trim().toLowerCase()
+      )
+
+      if (cityMatch && !cityMatch.is_active) {
+        return NextResponse.json(
+          {
+            error: `The city "${destinationCity}" is currently disabled by platform administrator. You can only create listings in active cities.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
 
     // Get provider or company profile using admin client to bypass RLS recursion
     let { data: provProfile } = await adminSupabase
@@ -155,6 +260,17 @@ export async function POST(request: Request) {
       provProfile = newProv
     }
 
+    const termsMetadata = JSON.stringify({
+      rental_terms: termsAndConditions || 'Rider-hosted hourly tourist service. Local host provides personal ride, fuel, and guidance during booked hours.',
+      trip_terms: termsAndConditions || 'Rider-hosted hourly tourist service. Local host provides personal ride, fuel, and guidance during booked hours.',
+      active_from: activeFrom || new Date().toISOString(),
+      active_until: activeUntil || null,
+      is_timed: Boolean(isTimed && activeUntil),
+      planned_spots: Array.isArray(plannedSpots) ? plannedSpots : [],
+      unseen_spots: Array.isArray(unseenSpots) ? unseenSpots : [],
+      hidden_spots: Array.isArray(hiddenSpots) ? hiddenSpots : [],
+    })
+
     // Insert Service Listing via adminSupabase (completely avoids RLS recursion stack depth error)
     const { data: listing, error: insertError } = await adminSupabase
       .from('service_listings')
@@ -177,7 +293,7 @@ export async function POST(request: Request) {
         images,
         included_services: includedServices,
         excluded_services: excludedServices,
-        terms_and_conditions: termsAndConditions,
+        terms_and_conditions: termsMetadata,
         cancellation_policy: cancellationPolicy,
         meeting_point: meetingPoint,
         pickup_location: pickupLocation,

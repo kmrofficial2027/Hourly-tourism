@@ -152,3 +152,109 @@ export function truncate(text: string, length: number): string {
   if (text.length <= length) return text
   return text.slice(0, length).trimEnd() + '…'
 }
+
+// ============================================================================
+// Image Normalization & Client Compression
+// ============================================================================
+
+export const DEFAULT_CATEGORY_IMAGES: Record<string, string> = {
+  bike: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80',
+  car: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=800&q=80',
+  van: 'https://images.unsplash.com/photo-1527786356703-4b100091cd2c?auto=format&fit=crop&w=800&q=80',
+  local_guide: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+  sightseeing_tour: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80',
+  experience: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&w=800&q=80',
+}
+
+/**
+ * Robustly normalizes images from any source (array, stringified JSON, Postgres array literal, single URL)
+ * into a clean array of valid image URLs / data strings.
+ */
+export function normalizeListingImages(images: any, category?: string): string[] {
+  const fallback = [DEFAULT_CATEGORY_IMAGES[category || 'car'] || DEFAULT_CATEGORY_IMAGES.car]
+
+  if (!images) return fallback
+
+  let result: string[] = []
+
+  if (Array.isArray(images)) {
+    result = images.filter((img) => typeof img === 'string' && img.trim().length > 0)
+  } else if (typeof images === 'string') {
+    const trimmed = images.trim()
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          result = parsed.filter((img) => typeof img === 'string' && img.trim().length > 0)
+        }
+      } catch {
+        // Fall through
+      }
+    } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      // Postgres array literal syntax: {url1,url2}
+      const rawItems = trimmed.slice(1, -1).split(',')
+      result = rawItems
+        .map((item) => item.replace(/^"|"$/g, '').trim())
+        .filter((item) => item.length > 0)
+    } else if (trimmed.startsWith('http') || trimmed.startsWith('data:image')) {
+      result = [trimmed]
+    }
+  }
+
+  return result.length > 0 ? result : fallback
+}
+
+/**
+ * Compresses an image file in the browser before upload using HTML Canvas.
+ * Resizes large camera photos to max width 1200px and exports as clean JPEG (~70KB - 120KB).
+ */
+export function compressImageFile(file: File, maxWidth = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const src = e.target?.result as string
+      if (!src) {
+        resolve('')
+        return
+      }
+
+      // If already small (< 150KB), resolve directly
+      if (file.size < 150 * 1024) {
+        resolve(src)
+        return
+      }
+
+      const img = new Image()
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            resolve(src)
+            return
+          }
+
+          ctx.drawImage(img, 0, 0, width, height)
+          const compressed = canvas.toDataURL('image/jpeg', quality)
+          resolve(compressed)
+        } catch {
+          resolve(src)
+        }
+      }
+      img.onerror = () => resolve(src)
+      img.src = src
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}

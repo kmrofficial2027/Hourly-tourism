@@ -6,12 +6,13 @@ import { AuthProvider } from '@/contexts/AuthContext'
 export const metadata: Metadata = {
   title: 'Hourly Tourism — Discover More. One Hour at a Time.',
   description:
-    'Online tourism marketplace to discover and book bikes, cars, vans, local tour guides, sightseeing tours, and unique travel experiences by the hour in Coimbatore, Tamil Nadu.',
+    'Online tourism marketplace to discover and book rider-hosted bike tours, chauffeured car trips, van group tours, local guides, sightseeing circuits, and unique travel experiences by the hour in Coimbatore and beyond.',
   keywords: [
     'hourly tourism',
-    'hourly bike rental',
-    'hourly car rental',
-    'hourly van rental',
+    'hourly bike tour',
+    'hourly car tour with chauffeur',
+    'hourly tourist ride',
+    'rider hosted tourism',
     'coimbatore tourism',
     'western ghats tour',
     'isha adiyogi tour',

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Filter, X, RotateCcw, Check } from 'lucide-react'
 import { SERVICE_CATEGORIES } from '@/lib/constants'
 import { Button } from '@/components/ui/Button'
@@ -30,6 +30,30 @@ export function FilterSidebar({
   className = '',
 }: FilterSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [activeCities, setActiveCities] = useState<{ label: string; value: string }[]>([
+    { label: 'All Regions', value: '' },
+    { label: '📍 Coimbatore', value: 'Coimbatore' },
+    { label: '📍 Pollachi', value: 'Pollachi' },
+  ])
+
+  useEffect(() => {
+    async function loadActiveCities() {
+      try {
+        const res = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.destinations?.length > 0) {
+            const list = data.destinations.map((d: any) => ({
+              label: `📍 ${d.name}`,
+              value: d.name,
+            }))
+            setActiveCities([{ label: 'All Regions', value: '' }, ...list])
+          }
+        }
+      } catch {}
+    }
+    loadActiveCities()
+  }, [])
 
   const handleCategoryToggle = (categoryValue: string) => {
     onFilterChange({
@@ -93,23 +117,13 @@ export function FilterSidebar({
         </select>
       </div>
 
-      {/* Coimbatore Circuits & Locations */}
+      {/* Regional Destinations & Circuits */}
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-emerald-800 mb-2">
-          Coimbatore Circuits
+          Regional Destinations & Circuits
         </label>
         <div className="flex flex-wrap gap-1.5">
-          {[
-            { label: 'All Coimbatore', value: '' },
-            { label: 'Isha Adiyogi', value: 'Isha' },
-            { label: 'Marudhamalai', value: 'Marudhamalai' },
-            { label: 'Siruvani Falls', value: 'Siruvani' },
-            { label: 'Valparai Ghats', value: 'Valparai' },
-            { label: 'Pollachi Country', value: 'Pollachi' },
-            { label: 'Perur Temple', value: 'Perur' },
-            { label: 'Gedee Museum', value: 'Gedee' },
-            { label: 'Baralikadu', value: 'Baralikadu' },
-          ].map((loc) => {
+          {activeCities.map((loc) => {
             const isSelected =
               (!filters.destination && loc.value === '') ||
               filters.destination?.toLowerCase() === loc.value.toLowerCase()

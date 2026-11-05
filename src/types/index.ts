@@ -4,7 +4,7 @@
 
 // --- Enums / Union Types ---
 
-export type UserRole = 'customer' | 'provider' | 'company' | 'admin'
+export type UserRole = 'customer' | 'provider' | 'admin'
 
 export type VehicleType = 'bike' | 'car' | 'van'
 
@@ -18,31 +18,57 @@ export type ServiceCategory =
 
 export type BookingStatus =
   | 'pending'
+  | 'awaiting_confirmation'
   | 'confirmed'
   | 'provider_accepted'
   | 'provider_rejected'
+  | 'provider_assigned'
+  | 'driver_on_the_way'
+  | 'trip_started'
   | 'in_progress'
   | 'completed'
+  | 'cancelled'
   | 'cancelled_by_customer'
   | 'cancelled_by_provider'
   | 'cancelled_by_admin'
+  | 'no_show'
+  | 'expired'
   | 'refund_initiated'
+  | 'refund_completed'
   | 'refunded'
+  | 'disputed'
 
 export type PaymentStatus =
   | 'pending'
   | 'authorized'
   | 'captured'
+  | 'completed'
+  | 'processing'
   | 'failed'
   | 'refund_initiated'
   | 'partially_refunded'
   | 'refunded'
 
+export type RefundStatus =
+  | 'not_required'
+  | 'initiated'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'rejected'
+
 export type VerificationStatus =
   | 'unverified'
+  | 'draft'
   | 'pending'
+  | 'submitted'
+  | 'under_review'
+  | 'approved'
   | 'verified'
   | 'rejected'
+  | 'suspended'
+  | 'documents_expiring'
+  | 'documents_expired'
 
 export type ListingStatus =
   | 'draft'
@@ -580,4 +606,146 @@ export interface BookingStatusOption {
   label: string
   value: BookingStatus
   color: string
+}
+
+// --- Extended Production Marketplace Types ---
+
+export interface FleetVehicle {
+  id: string
+  provider_id: string
+  vehicle_type: VehicleType
+  make: string
+  model: string
+  year: number
+  registration_number: string
+  color: string
+  fuel_type: 'petrol' | 'diesel' | 'electric' | 'hybrid' | 'cng'
+  transmission: 'manual' | 'automatic'
+  seating_capacity: number
+  luggage_capacity?: number | null
+  features: string[]
+  photos: string[]
+  rc_document_url?: string | null
+  insurance_document_url?: string | null
+  insurance_expiry?: string | null
+  permit_expiry?: string | null
+  fitness_expiry?: string | null
+  pollution_expiry?: string | null
+  maintenance_status: 'available' | 'under_maintenance' | 'unavailable'
+  assigned_driver_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FleetDriver {
+  id: string
+  provider_id: string
+  full_name: string
+  phone: string
+  license_number: string
+  license_expiry?: string | null
+  license_document_url?: string | null
+  experience_years: number
+  status: 'active' | 'inactive' | 'on_trip'
+  assigned_vehicle_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BookingMessage {
+  id: string
+  booking_id: string
+  sender_id: string
+  receiver_id: string
+  sender_role: 'customer' | 'provider' | 'admin' | 'system'
+  message: string
+  attachment_url?: string | null
+  is_read: boolean
+  created_at: string
+  sender_name?: string
+}
+
+export interface BookingDispute {
+  id: string
+  booking_id: string
+  customer_id: string
+  provider_id: string
+  dispute_category: 'late_pickup' | 'wrong_vehicle' | 'damage_claim' | 'unfair_cancellation' | 'safety_behavior' | 'refund_issue' | 'other'
+  description: string
+  evidence_urls: string[]
+  status: 'open' | 'under_review' | 'awaiting_evidence' | 'resolved' | 'closed'
+  resolution_type?: 'full_refund' | 'partial_refund' | 'provider_favored' | 'mutual_settlement' | 'dismissed' | null
+  refund_amount?: number
+  admin_notes?: string | null
+  resolved_by?: string | null
+  resolved_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SafetyIncident {
+  id: string
+  booking_id: string
+  user_id: string
+  latitude?: number | null
+  longitude?: number | null
+  address?: string | null
+  emergency_contacts_notified: boolean
+  status: 'active' | 'investigating' | 'resolved'
+  incident_notes?: string | null
+  resolved_by?: string | null
+  resolved_at?: string | null
+  created_at: string
+}
+
+export interface CustomerSavedAddress {
+  id: string
+  customer_id: string
+  label: string
+  address_line: string
+  city: string
+  latitude?: number | null
+  longitude?: number | null
+  is_default: boolean
+  created_at: string
+}
+
+export interface CustomerPreferences {
+  vehicle_types?: VehicleType[]
+  max_hourly_rate?: number
+  preferred_languages?: string[]
+  accessibility_needs?: boolean
+  child_seat_required?: boolean
+  luggage_requirement?: string
+  notification_email?: boolean
+  notification_sms?: boolean
+  notification_whatsapp?: boolean
+  notification_push?: boolean
+}
+
+export interface AdminAuditLog {
+  id: string
+  admin_id: string
+  admin_email?: string
+  action: string
+  target_type: 'booking' | 'provider' | 'listing' | 'user' | 'settings' | 'payout' | 'refund'
+  target_id: string
+  details?: Record<string, any>
+  ip_address?: string | null
+  created_at: string
+}
+
+export interface ProviderScorecard {
+  provider_id: string
+  acceptance_rate: number
+  rejection_rate: number
+  avg_response_time_minutes: number
+  cancellation_rate: number
+  completion_rate: number
+  no_show_rate: number
+  punctuality_score: number
+  customer_rating: number
+  repeat_customer_rate: number
+  total_revenue: number
+  score_updated_at: string
 }
