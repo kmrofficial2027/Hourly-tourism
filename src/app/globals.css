@@ -85,6 +85,10 @@ body {
     text-wrap: balance;
   }
 
+  .safe-area-pb {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
   .animate-in {
     animation: fadeIn 0.5s ease-in-out;
   }

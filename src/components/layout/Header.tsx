@@ -65,16 +65,17 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full transition-all duration-300 ${
-        scrolled
-          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 py-3'
-          : 'bg-white/80 backdrop-blur-sm border-b border-gray-100 py-4'
-      }`}
+      className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled
+          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 py-3 sm:py-3.5'
+          : 'bg-white/95 backdrop-blur-sm border-b border-gray-100 py-4 sm:py-5'
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
-          {/* Brand Logo */}
-          <Logo variant="header" />
+          {/* Brand Logo (prominently sized on both mobile and desktop) */}
+          <div className="flex items-center">
+            <Logo variant="header" showTagline />
+          </div>
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
@@ -84,11 +85,10 @@ export function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    isActive
+                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${isActive
                       ? 'text-[#15803d] bg-green-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
-                  }`}
+                    }`}
                 >
                   {link.label}
                 </Link>

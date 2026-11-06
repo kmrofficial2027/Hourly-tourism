@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/Toast'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { PushNotificationSubscriber } from '@/components/notifications/PushNotificationSubscriber'
 
 export const metadata: Metadata = {
   title: 'Hourly Tourism — Discover More. One Hour at a Time.',
@@ -74,7 +75,10 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className="min-h-screen bg-white text-gray-900 antialiased font-sans selection:bg-emerald-100 selection:text-emerald-900">
         <ToastProvider />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PushNotificationSubscriber />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

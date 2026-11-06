@@ -17,38 +17,38 @@ export function Logo({
   className = '',
   href = '/',
 }: LogoProps) {
-  // Dimension and styling classes based on variant
+  // Dimension and styling classes based on variant (tuned for clear, prominent visibility)
   const getVariantStyles = () => {
     switch (variant) {
       case 'header':
         return {
-          container: 'h-14 sm:h-16 lg:h-20 flex items-center',
-          image: 'h-12 sm:h-14 lg:h-18 w-auto object-contain',
+          container: 'h-16 sm:h-20 lg:h-24 flex items-center',
+          image: 'h-14 sm:h-18 lg:h-22 xl:h-24 w-auto object-contain',
         }
       case 'footer':
         return {
-          container: 'h-18 sm:h-22 flex items-center',
-          image: 'h-16 sm:h-20 w-auto object-contain',
+          container: 'h-20 sm:h-24 flex items-center',
+          image: 'h-18 sm:h-22 w-auto object-contain',
         }
       case 'hero':
         return {
-          container: 'h-24 sm:h-28 md:h-36 flex items-center justify-center',
-          image: 'h-22 sm:h-26 md:h-32 w-auto object-contain drop-shadow-md',
+          container: 'h-28 sm:h-36 md:h-44 flex items-center justify-center',
+          image: 'h-26 sm:h-32 md:h-40 w-auto object-contain drop-shadow-md',
         }
       case 'compact':
         return {
-          container: 'h-12 sm:h-14 flex items-center',
-          image: 'h-11 sm:h-13 w-auto object-contain',
+          container: 'h-14 sm:h-16 lg:h-18 flex items-center',
+          image: 'h-13 sm:h-15 lg:h-17 w-auto object-contain',
         }
       case 'icon':
         return {
-          container: 'w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
+          container: 'w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
           image: 'w-full h-full object-cover scale-125',
         }
       default:
         return {
-          container: 'h-14 sm:h-16 lg:h-20 flex items-center',
-          image: 'h-12 sm:h-14 lg:h-18 w-auto object-contain',
+          container: 'h-16 sm:h-20 lg:h-24 flex items-center',
+          image: 'h-14 sm:h-18 lg:h-22 xl:h-24 w-auto object-contain',
         }
     }
   }

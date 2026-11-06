@@ -100,8 +100,8 @@ function ExploreContent() {
     <div className="min-h-screen flex flex-col bg-slate-50/70">
       <Header />
 
-      {/* Top Search bar wrapper with glassmorphism */}
-      <div className="bg-white border-b border-slate-200/80 py-5 sticky top-16 z-30 shadow-sm backdrop-blur-md bg-white/95">
+      {/* Top Search bar wrapper (scrolls naturally with page) */}
+      <div className="bg-white border-b border-slate-200/80 py-5 shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SearchBar
             compact

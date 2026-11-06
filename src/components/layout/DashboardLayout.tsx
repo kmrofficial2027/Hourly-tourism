@@ -27,6 +27,7 @@ import {
   ShieldAlert,
   HelpCircle,
   Layers,
+  BellRing,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
@@ -70,6 +71,30 @@ export function DashboardLayout({
   const router = useRouter()
   const { user, profile, signOut, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showBottomNav, setShowBottomNav] = useState(true)
+
+  // Smart mobile scroll listener: hide bottom nav when scrolling down to reveal full screen, show when scrolling up
+  useEffect(() => {
+    let lastY = typeof window !== 'undefined' ? window.scrollY : 0
+
+    const handleScroll = () => {
+      const currentY = window.scrollY
+      const delta = currentY - lastY
+
+      // Scrolled down past header threshold -> hide bottom bar
+      if (delta > 8 && currentY > 50) {
+        setShowBottomNav(false)
+      } else if (delta < -8 || currentY <= 30) {
+        // Scrolled up or at top -> show bottom bar
+        setShowBottomNav(true)
+      }
+
+      lastY = currentY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Enforce role-specific portal boundaries on client side
   useEffect(() => {
@@ -107,6 +132,7 @@ export function DashboardLayout({
       { label: 'Marketplace Analytics', href: '/admin/analytics', icon: TrendingUp },
       { label: 'Destinations & Cities', href: '/admin/destinations', icon: MapPin },
       { label: 'Footer & Category Pages', href: '/admin/footer-pages', icon: Layers },
+      { label: 'Push Notifications', href: '/admin/push-notifications', icon: BellRing },
       { label: 'Customers', href: '/admin/customers', icon: Users },
       { label: 'Providers & Verifications', href: '/admin/providers', icon: ShieldCheck },
       { label: 'Listings Moderation', href: '/admin/listings', icon: Compass },
@@ -120,11 +146,37 @@ export function DashboardLayout({
 
   const currentNav = navConfigs[role] || navConfigs.customer
 
-  // Bottom tab bar items (5 primary — first 4 from nav + profile)
-  const bottomTabs = [
-    ...(currentNav.slice(0, 4)),
-    { label: 'Profile', href: currentNav.find(n => n.href.includes('profile'))?.href || '/dashboard/profile', icon: User },
-  ]
+  // Dedicated mobile bottom navigation items with clean, concise labels
+  const getBottomTabs = () => {
+    switch (role) {
+      case 'provider':
+        return [
+          { label: 'Overview', href: '/provider', icon: LayoutDashboard },
+          { label: 'Listings', href: '/provider/listings', icon: Compass },
+          { label: 'Bookings', href: '/provider/bookings', icon: Calendar },
+          { label: 'Earnings', href: '/provider/earnings', icon: CreditCard },
+          { label: 'Profile', href: '/provider/profile', icon: User },
+        ]
+      case 'admin':
+        return [
+          { label: 'Overview', href: '/admin', icon: LayoutDashboard },
+          { label: 'Analytics', href: '/admin/analytics', icon: TrendingUp },
+          { label: 'Cities', href: '/admin/destinations', icon: MapPin },
+          { label: 'Bookings', href: '/admin/bookings', icon: Calendar },
+          { label: 'Settings', href: '/admin/settings', icon: Settings },
+        ]
+      default: // customer
+        return [
+          { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+          { label: 'Bookings', href: '/dashboard/bookings', icon: Calendar },
+          { label: 'Reviews', href: '/dashboard/reviews', icon: Star },
+          { label: 'Support', href: '/dashboard/support', icon: HelpCircle },
+          { label: 'Profile', href: '/dashboard/profile', icon: User },
+        ]
+    }
+  }
+
+  const bottomTabs = getBottomTabs()
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'My Account'
   const initials = displayName
@@ -151,17 +203,25 @@ export function DashboardLayout({
         }`}
       >
         {/* Brand / Logo */}
-        <div className="p-5 flex items-center justify-between border-b border-white/5">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-white/10 bg-slate-900/60">
           <div className="flex flex-col">
-            {/* Logo rendered on dark bg */}
-            <Logo variant="compact" />
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#ff7a00] mt-1 pl-0.5">
+            <Link
+              href="/"
+              className="bg-white rounded-2xl px-3 py-2 shadow-lg inline-block hover:scale-[1.02] transition-transform"
+            >
+              <img
+                src="/images/logo.png"
+                alt="Hourly Tourism"
+                className="h-14 sm:h-16 w-auto object-contain"
+              />
+            </Link>
+            <span className="text-[11px] font-black uppercase tracking-widest text-[#ff7a00] mt-2 pl-1">
               {role} Portal
             </span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 lg:hidden transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 lg:hidden transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -263,34 +323,52 @@ export function DashboardLayout({
 
       {/* ── MAIN CONTENT AREA ──────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* ── Top Header Bar ── */}
-        <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm">
-          {/* Left: hamburger + title */}
+        {/* ── Top Header Bar (Taller, prominent & mobile-centered logo) ── */}
+        <header className="sticky top-0 z-30 h-20 sm:h-22 bg-white/95 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm">
+          {/* Left: Hamburger (mobile) or Page Title (desktop) */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 lg:hidden transition-colors"
+              className="p-2.5 rounded-2xl text-gray-700 hover:text-gray-900 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 lg:hidden transition-colors shadow-xs"
+              aria-label="Open Navigation Menu"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="lg:hidden">
-              <Logo variant="compact" />
-            </div>
+
             {/* Page title — desktop */}
-            <div className="hidden lg:flex items-center gap-2">
-              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#ff7a00] to-[#f59e0b]" />
-              <h1 className="text-lg font-black text-gray-900 tracking-tight">
-                {title || 'Dashboard'}
-              </h1>
+            <div className="hidden lg:flex items-center gap-3">
+              <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-[#ff7a00] to-[#f59e0b]" />
+              <div>
+                <h1 className="text-xl font-black text-gray-900 tracking-tight">
+                  {title || 'Dashboard'}
+                </h1>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  Hourly Tourism • {role} Portal
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Right: notifications + role badge */}
-          <div className="flex items-center gap-3">
-            {/* NotificationCenter already has its own bell + unread dot */}
+          {/* Center on mobile: Prominently Sized Centered Brand Logo */}
+          <div className="lg:hidden flex-1 flex items-center justify-center px-2">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center p-1 bg-white rounded-2xl shadow-xs hover:scale-105 transition-transform"
+            >
+              <img
+                src="/images/logo.png"
+                alt="Hourly Tourism"
+                className="h-14 sm:h-16 w-auto object-contain"
+              />
+            </Link>
+          </div>
+
+          {/* Right: notifications + role badge + avatar */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Real Live NotificationCenter */}
             <NotificationCenter role={role} />
 
-            <div className="h-5 w-px bg-gray-200" />
+            <div className="hidden sm:block h-6 w-px bg-gray-200" />
 
             {/* Role badge */}
             <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-50 text-[#ff7a00] border border-orange-200/60">
@@ -308,15 +386,24 @@ export function DashboardLayout({
           </div>
         </header>
 
-        {/* ── Main Body ── */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        {/* ── Main Body (Unrestricted mobile scroll + generous bottom clearance) ── */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-32 sm:pb-36 lg:pb-8">
           {children}
+          {/* Physical spacer guaranteeing full visibility above mobile tabs & gesture bar */}
+          <div className="h-16 lg:hidden pointer-events-none" aria-hidden="true" />
         </main>
 
         {/* ── MOBILE BOTTOM TAB BAR ──────────────────────────────────── */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-xl shadow-black/10">
-          <div className="flex items-center justify-around px-2 py-2 safe-area-pb">
-            {bottomTabs.slice(0, 5).map((item, idx) => {
+        <nav
+          className={`fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-xl shadow-black/10 transition-transform duration-300 ease-in-out ${
+            showBottomNav ? 'translate-y-0' : 'translate-y-full pointer-events-none'
+          }`}
+          style={{
+            paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
+          }}
+        >
+          <div className="flex items-center justify-around px-2 py-2">
+            {bottomTabs.map((item) => {
               const isActive =
                 pathname === item.href ||
                 (item.href !== '/dashboard' &&
@@ -328,7 +415,7 @@ export function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200 group min-w-0"
+                  className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-2xl transition-all duration-200 group min-w-0 flex-1"
                 >
                   <div
                     className={`p-1.5 rounded-xl transition-all duration-200 ${
@@ -344,11 +431,11 @@ export function DashboardLayout({
                     />
                   </div>
                   <span
-                    className={`text-[9px] font-bold truncate transition-colors max-w-[52px] text-center ${
-                      isActive ? 'text-[#ff7a00]' : 'text-gray-400'
+                    className={`text-[10px] font-bold truncate transition-colors text-center w-full ${
+                      isActive ? 'text-[#ff7a00]' : 'text-gray-500'
                     }`}
                   >
-                    {item.label.split(' ')[0]}
+                    {item.label}
                   </span>
                 </Link>
               )
