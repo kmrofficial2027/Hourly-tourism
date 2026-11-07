@@ -35,7 +35,12 @@ import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
 import { showToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils'
 import { useProviderQueue } from '@/hooks/useProviderQueue'
-import { playMildHornBuzzer } from '@/lib/soundUtils'
+import {
+  playMildHornBuzzer,
+  startContinuousProviderBuzzer,
+  stopContinuousProviderBuzzer,
+  isProviderBuzzerActive,
+} from '@/lib/soundUtils'
 
 export default function ProviderOverviewPage() {
   const [stats, setStats] = useState({
@@ -159,11 +164,24 @@ export default function ProviderOverviewPage() {
   }
 
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const [buzzerRinging, setBuzzerRinging] = useState(false)
+
+  useEffect(() => {
+    const handleBuzzerChange = (e: any) => {
+      setBuzzerRinging(Boolean(e.detail?.active))
+    }
+    window.addEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
+    return () => {
+      window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
+      stopContinuousProviderBuzzer()
+    }
+  }, [])
 
   const handleAcceptRequest = async (bookingId: string) => {
     setActionLoadingId(bookingId)
+    // STOP CONTINUOUS BUZZER IMMEDIATELY ON ACCEPT
+    stopContinuousProviderBuzzer()
     try {
-      playMildHornBuzzer()
       const res = await fetch(`/api/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -192,6 +210,8 @@ export default function ProviderOverviewPage() {
 
   const handleRejectRequest = async (bookingId: string) => {
     setActionLoadingId(bookingId)
+    // STOP CONTINUOUS BUZZER IMMEDIATELY ON REJECT / DECLINE
+    stopContinuousProviderBuzzer()
     try {
       const res = await fetch(`/api/bookings/${bookingId}/status`, {
         method: 'PATCH',
@@ -354,6 +374,38 @@ export default function ProviderOverviewPage() {
             </div>
           </div>
         </div>
+
+        {/* Continuous Looping Buzzer Alert Banner for Provider */}
+        {buzzerRinging && (
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white shadow-xl shadow-red-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse border-2 border-yellow-300">
+            <div className="flex items-center space-x-3">
+              <span className="w-10 h-10 rounded-2xl bg-white text-red-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
+                🚨
+              </span>
+              <div>
+                <p className="font-black text-sm">New Booking Arrived — Audio Buzzer Ringing!</p>
+                <p className="text-xs text-white/95">
+                  Accept or Decline the request below to confirm the ride and silence the buzzer.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => stopContinuousProviderBuzzer()}
+                className="px-3.5 py-2 rounded-xl bg-black/40 hover:bg-black/60 text-white text-xs font-bold transition-colors"
+              >
+                Mute Buzzer
+              </button>
+              <Link
+                href="/provider/bookings"
+                className="px-4 py-2 rounded-xl bg-white text-red-700 text-xs font-black hover:bg-red-50 transition-colors text-center shrink-0 shadow-sm"
+              >
+                Open Bookings Queue →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Real-time New Booking Alert Banner */}
         {hasNewPing && (

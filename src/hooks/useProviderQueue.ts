@@ -3,7 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { showToast } from '@/components/ui/Toast'
-import { playMildHornBuzzer } from '@/lib/soundUtils'
+import {
+  playMildHornBuzzer,
+  startContinuousProviderBuzzer,
+  stopContinuousProviderBuzzer,
+} from '@/lib/soundUtils'
 
 export function useProviderQueue(providerId?: string) {
   const [pendingCount, setPendingCount] = useState(0)
@@ -20,16 +24,25 @@ export function useProviderQueue(providerId?: string) {
       const res = await fetch('/api/bookings?role=provider')
       if (res.ok) {
         const data = await res.json()
+        const pendingBookings = (data.bookings || []).filter(
+          (b: any) => ['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(b.status)
+        )
         const activeBookings = (data.bookings || []).filter(
           (b: any) => ['pending', 'pending_provider_approval', 'confirmed'].includes(b.status)
         )
         const newCount = activeBookings.length
 
-        // Sound mild horn if count increased during active session
-        if (previousCountRef.current !== null && newCount > previousCountRef.current) {
-          playMildHornBuzzer()
-          showToast.success('🚗 New Hourly Booking Request / Trip Confirmed!')
+        // If new pending booking arrived, start continuous buzzer until accepted/declined
+        if (pendingBookings.length > 0) {
+          if (previousCountRef.current !== null && newCount > previousCountRef.current) {
+            startContinuousProviderBuzzer()
+            showToast.success('🚗 New Hourly Booking Request Received! Buzzer ringing.')
+          }
+        } else {
+          // If no pending bookings remaining, stop buzzer
+          stopContinuousProviderBuzzer()
         }
+
         previousCountRef.current = newCount
 
         setPendingCount(newCount)
@@ -61,17 +74,17 @@ export function useProviderQueue(providerId?: string) {
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const booking = payload.new as any
-            if (['pending', 'pending_provider_approval', 'confirmed'].includes(booking.status)) {
+            if (['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(booking.status)) {
               setPendingCount((prev) => prev + 1)
               setLatestPendingBooking(booking)
               setHasNewPing(true)
-              playMildHornBuzzer()
-              showToast.success(
-                booking.status === 'confirmed'
-                  ? '🎉 Tourist Confirmed Ride! Check Start OTP.'
-                  : '⚡ New Hourly Booking Request Received!'
-              )
+              // START CONTINUOUS BUZZER UNTIL ACCEPTED OR DECLINED
+              startContinuousProviderBuzzer()
+              showToast.success('⚡ New Booking Request! Accept or Decline to stop buzzer alert.')
               setTimeout(() => setHasNewPing(false), 8000)
+            } else if (['confirmed', 'rejected', 'cancelled'].includes(booking.status)) {
+              // Status resolved -> stop continuous buzzer
+              stopContinuousProviderBuzzer()
             }
             fetchPending()
           }

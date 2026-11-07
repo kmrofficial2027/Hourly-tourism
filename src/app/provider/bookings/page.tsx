@@ -28,7 +28,12 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { showToast } from '@/components/ui/Toast'
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils'
-import { playMildHornBuzzer } from '@/lib/soundUtils'
+import {
+  playMildHornBuzzer,
+  startContinuousProviderBuzzer,
+  stopContinuousProviderBuzzer,
+  isProviderBuzzerActive,
+} from '@/lib/soundUtils'
 import { createClient } from '@/lib/supabase/client'
 import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
 
@@ -37,6 +42,7 @@ export default function ProviderBookingsPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [trackingBooking, setTrackingBooking] = useState<any | null>(null)
+  const [buzzerRinging, setBuzzerRinging] = useState(false)
   const previousBookingsCountRef = useRef<number | null>(null)
 
   // QR Payment Collection Modal state
@@ -77,12 +83,17 @@ export default function ProviderBookingsPage() {
         const data = await res.json()
         const fetched = data.bookings || []
         
-        // Check if new pending bookings arrived
-        if (previousBookingsCountRef.current !== null && fetched.length > previousBookingsCountRef.current) {
-          playMildHornBuzzer()
+        // Check if pending bookings exist
+        const hasPending = fetched.some((b: any) =>
+          ['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(b.status)
+        )
+        if (hasPending) {
+          startContinuousProviderBuzzer()
+        } else {
+          stopContinuousProviderBuzzer()
         }
-        previousBookingsCountRef.current = fetched.length
 
+        previousBookingsCountRef.current = fetched.length
         setBookings(fetched)
 
         // Check URL parameters for direct accept or reject actions
@@ -92,10 +103,11 @@ export default function ProviderBookingsPage() {
           const targetAction = sp.get('action')
           if (targetId) {
             if (targetAction === 'accept') {
-              playMildHornBuzzer()
+              stopContinuousProviderBuzzer()
               handleUpdateStatus(targetId, 'confirmed')
               window.history.replaceState({}, '', '/provider/bookings')
             } else if (targetAction === 'reject') {
+              stopContinuousProviderBuzzer()
               handleUpdateStatus(targetId, 'rejected', undefined, 'Declined by host')
               window.history.replaceState({}, '', '/provider/bookings')
             }
@@ -112,23 +124,33 @@ export default function ProviderBookingsPage() {
   useEffect(() => {
     loadBookings()
 
+    const handleBuzzerChange = (e: any) => {
+      setBuzzerRinging(Boolean(e.detail?.active))
+    }
+    window.addEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
+
     // Realtime listener for incoming booking requests
     const supabase = createClient()
     const channel = supabase
       .channel('provider-bookings-live-alerts')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bookings' },
+        { event: '*', schema: 'public', table: 'bookings' },
         (payload) => {
-          playMildHornBuzzer()
-          showToast.success('🚗 New Hourly Booking Request Received!')
+          const b = payload.new as any
+          if (['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(b?.status)) {
+            startContinuousProviderBuzzer()
+            showToast.success('🚗 New Booking Request! Accept or Decline to stop buzzer alert.')
+          }
           loadBookings()
         }
       )
       .subscribe()
 
     return () => {
+      window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
       supabase.removeChannel(channel)
+      stopContinuousProviderBuzzer()
     }
   }, [])
 
@@ -139,6 +161,11 @@ export default function ProviderBookingsPage() {
     reason?: string,
     otp?: string
   ) => {
+    // If provider is accepting or declining, STOP continuous buzzer immediately
+    if (['confirmed', 'rejected', 'cancelled'].includes(newStatus)) {
+      stopContinuousProviderBuzzer()
+    }
+
     setActionLoading(bookingId)
     try {
       const payload: any = { status: newStatus }
@@ -302,6 +329,30 @@ export default function ProviderBookingsPage() {
             <span>Audio Buzzer Active</span>
           </button>
         </div>
+
+        {/* Continuous Looping Buzzer Alert Banner for Provider */}
+        {buzzerRinging && (
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white shadow-xl shadow-red-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse border-2 border-yellow-300">
+            <div className="flex items-center space-x-3">
+              <span className="w-10 h-10 rounded-2xl bg-white text-red-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
+                🚨
+              </span>
+              <div>
+                <p className="font-black text-sm">New Booking Request Arrived — Buzzer Ringing!</p>
+                <p className="text-xs text-white/95">
+                  Accept & Confirm or Decline the pending request below to stop the alert buzzer.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => stopContinuousProviderBuzzer()}
+              className="px-4 py-2 rounded-xl bg-black/40 hover:bg-black/60 text-white text-xs font-bold transition-colors shrink-0"
+            >
+              Mute Buzzer
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="p-12 text-center text-xs text-gray-400">Loading bookings...</div>

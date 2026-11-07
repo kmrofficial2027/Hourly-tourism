@@ -41,6 +41,8 @@ import { getBookingStartOtp } from '@/lib/otpUtils'
 import { generateInvoiceForBooking } from '@/lib/invoiceUtils'
 import { useAuth } from '@/hooks/useAuth'
 import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
+import { createClient } from '@/lib/supabase/client'
+import { playBookingAcceptedSound, playBookingRejectedSound } from '@/lib/soundUtils'
 
 // Helper: Calculate if live tracking radar should be active (5 mins before start time or during trip)
 function isTrackingActive(booking: any): boolean {
@@ -131,6 +133,45 @@ function CustomerBookingsContent() {
   useEffect(() => {
     fetchBookings()
   }, [highlightBookingId])
+
+  // Realtime audio intimation when host accepts (Joyful Chime) or declines (Alert Tone)
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('customer-live-booking-status-alerts')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bookings',
+        },
+        (payload) => {
+          const updated = payload.new as any
+          const old = payload.old as any
+          if (!updated) return
+
+          // 1. Host Accepted & Confirmed -> Play Joyful Trip Accepted Chime 🎉
+          if (updated.status === 'confirmed' && old?.status !== 'confirmed') {
+            playBookingAcceptedSound()
+            showToast.success(`🎉 Your ride #${updated.booking_number || ''} was ACCEPTED by host! Start OTP is ready.`)
+            fetchBookings()
+          }
+
+          // 2. Host Declined / Rejected -> Play Distinct Single Alert Tone
+          if (['rejected', 'cancelled'].includes(updated.status) && old?.status === 'pending') {
+            playBookingRejectedSound()
+            showToast.error(`Your booking request #${updated.booking_number || ''} was declined by the host. Please choose another host or slot.`)
+            fetchBookings()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   // Handle return redirect from Cashfree
   useEffect(() => {

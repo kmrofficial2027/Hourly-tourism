@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { showToast } from '@/components/ui/Toast'
+import { playBookingAcceptedSound, playBookingRejectedSound } from '@/lib/soundUtils'
 
 export interface BookingRealtimeState {
   status: string | null
@@ -44,6 +45,14 @@ export function useRealtimeBooking(bookingId: string | null | undefined, onStatu
               lastUpdated: new Date(),
               isConnected: true,
             })
+
+            // Audio Intimation for Customer: Two Distinct Sounds
+            if (newStatus === 'confirmed') {
+              playBookingAcceptedSound()
+            } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
+              playBookingRejectedSound()
+            }
+
             const formatted = newStatus.replace(/_/g, ' ')
             showToast.success(`Live Update: Booking status is now "${formatted}"`)
             if (onStatusChange) {
