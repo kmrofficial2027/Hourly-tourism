@@ -15,6 +15,8 @@ export interface SearchBarProps {
   className?: string
 }
 
+let clientCachedCities: any[] | null = null
+
 export function SearchBar({
   initialDestination = '',
   initialCategory = '',
@@ -30,16 +32,22 @@ export function SearchBar({
   const [date, setDate] = useState(initialDate)
   const [time, setTime] = useState(initialTime)
   const [duration, setDuration] = useState(initialDuration)
-  const [launchedCities, setLaunchedCities] = useState<any[]>([])
+  const [launchedCities, setLaunchedCities] = useState<any[]>(clientCachedCities || [])
 
   React.useEffect(() => {
+    if (clientCachedCities && clientCachedCities.length > 0) {
+      setLaunchedCities(clientCachedCities)
+      return
+    }
+
     async function loadActiveCities() {
       try {
-        const res = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch('/api/destinations')
         if (res.ok) {
           const data = await res.json()
           const list = data.cities || data.destinations
           if (list && Array.isArray(list) && list.length > 0) {
+            clientCachedCities = list
             setLaunchedCities(list)
           }
         }

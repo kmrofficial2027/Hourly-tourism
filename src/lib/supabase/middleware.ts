@@ -7,7 +7,34 @@ const DEFAULT_SUPABASE_ANON_KEY =
 const DEFAULT_SERVICE_ROLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZHR4ZG13emtram94bWl6Z2plIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzcwOTkyOSwiZXhwIjoyMTA5Mjg1OTI5fQ.bfrgLYrm-iA_DxTjPqP7t5ZiU8Hly3WRcee-6Fj60JQ'
 
+// High-speed in-memory role cache to avoid repeat Supabase REST lookups across navigations (5 min TTL)
+const roleCache = new Map<string, { role: string; ts: number }>()
+const ROLE_CACHE_TTL = 5 * 60 * 1000
+
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // FAST PATH 1: API routes handle their own auth; skip middleware overhead completely
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
+  // FAST PATH 2: Static assets, icons, fonts, and images
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/images') ||
+    pathname.endsWith('.ico') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.svg') ||
+    pathname.endsWith('.webp') ||
+    pathname.endsWith('.css') ||
+    pathname.endsWith('.js')
+  ) {
+    return NextResponse.next()
+  }
+
   // 1. Canonicalize any Netlify preview hash deployments to the production domain
   const hostname = request.nextUrl.hostname
   if (
@@ -16,15 +43,15 @@ export async function updateSession(request: NextRequest) {
     !hostname.includes('localhost')
   ) {
     const canonicalUrl = new URL(
-      request.nextUrl.pathname + request.nextUrl.search,
+      pathname + request.nextUrl.search,
       'https://hourlytourism.netlify.app'
     )
     return NextResponse.redirect(canonicalUrl)
   }
 
-  // 2. If an OAuth authorization code lands on ANY route (especially / fallback from Supabase Site URL):
+  // 2. If an OAuth authorization code lands on ANY route:
   const code = request.nextUrl.searchParams.get('code')
-  if (code && request.nextUrl.pathname !== '/auth/callback') {
+  if (code && pathname !== '/auth/callback') {
     const callbackUrl = new URL('/auth/callback', request.url)
     request.nextUrl.searchParams.forEach((val, key) => {
       callbackUrl.searchParams.set(key, val)
@@ -32,20 +59,34 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(callbackUrl)
   }
 
-  // 3. Let /auth/callback handle token exchange cleanly without middleware interception
-  if (request.nextUrl.pathname === '/auth/callback') {
+  // 3. Let /auth/callback handle token exchange cleanly
+  if (pathname === '/auth/callback') {
+    return NextResponse.next()
+  }
+
+  // 4. Legacy redirect
+  if (pathname.startsWith('/company')) {
+    return NextResponse.redirect(new URL('/provider', request.url))
+  }
+
+  const isLoginPage = pathname === '/admin/login' || pathname === '/login'
+  const isSignupPage = pathname === '/signup'
+  const protectedPaths = ['/dashboard', '/provider', '/admin']
+  const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p)) && !isLoginPage
+
+  // FAST PATH 3: Public pages (Homepage, Explore, Destinations, Terms, etc.)
+  // Never make remote auth/database calls for public visitors!
+  if (!isProtectedRoute && !isLoginPage && !isSignupPage) {
     return NextResponse.next()
   }
 
   let supabaseResponse = NextResponse.next({ request })
 
   const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const url =
-    envUrl && !envUrl.includes('placeholder') ? envUrl : DEFAULT_SUPABASE_URL
+  const url = envUrl && !envUrl.includes('placeholder') ? envUrl : DEFAULT_SUPABASE_URL
 
   const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const anonKey =
-    envKey && !envKey.includes('placeholder') ? envKey : DEFAULT_SUPABASE_ANON_KEY
+  const anonKey = envKey && !envKey.includes('placeholder') ? envKey : DEFAULT_SUPABASE_ANON_KEY
 
   const envServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const serviceKey =
@@ -54,100 +95,90 @@ export async function updateSession(request: NextRequest) {
       : DEFAULT_SERVICE_ROLE_KEY
 
   try {
-    const supabase = createServerClient(
-      url,
-      anonKey,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            supabaseResponse = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            )
-          },
+    const supabase = createServerClient(url, anonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
         },
-      }
-    )
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    })
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    const isLoginPage = request.nextUrl.pathname === '/admin/login' || request.nextUrl.pathname === '/login'
-    const isSignupPage = request.nextUrl.pathname === '/signup'
-
-    // If any legacy /company link is requested, redirect directly to /provider
-    if (request.nextUrl.pathname.startsWith('/company')) {
-      return NextResponse.redirect(new URL('/provider', request.url))
-    }
-
-    const protectedPaths = ['/dashboard', '/provider', '/admin']
-    const isProtectedRoute = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path)) && !isLoginPage
-
-    // 1. If unauthenticated user tries to access protected portal, redirect to login
+    // 1. Unauthenticated users trying to access protected portals -> redirect to login
     if (isProtectedRoute && !user) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = request.nextUrl.pathname.startsWith('/admin') ? '/admin/login' : '/login'
-      redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+      redirectUrl.pathname = pathname.startsWith('/admin') ? '/admin/login' : '/login'
+      redirectUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
-    // 2. Resolve database role for authenticated user
-    let userRole = (user?.user_metadata?.role as string) || (user?.app_metadata?.role as string)
+    // 2. Resolve database role for authenticated user (use memory cache first)
     if (user) {
-      try {
-        const res = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-        })
-        const profData = await res.json()
-        if (profData?.[0]?.role) {
-          userRole = profData[0].role
-        }
+      let userRole: string | undefined
+      const cached = roleCache.get(user.id)
+      if (cached && Date.now() - cached.ts < ROLE_CACHE_TTL) {
+        userRole = cached.role
+      } else {
+        userRole = (user?.user_metadata?.role as string) || (user?.app_metadata?.role as string)
+      }
 
-        // If not already verified as admin, check if user is a registered provider
-        if (userRole !== 'admin') {
-          const provRes = await fetch(`${url}/rest/v1/provider_profiles?user_id=eq.${user.id}&select=id`, {
+      // Only query Supabase REST if role is still unknown
+      if (!userRole) {
+        try {
+          const res = await fetch(`${url}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
             headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
           })
-          const provData = await provRes.json()
-          if (provData?.[0]?.id) {
-            userRole = 'provider'
+          const profData = await res.json()
+          if (profData?.[0]?.role) {
+            userRole = profData[0].role
           }
-        }
-      } catch { }
-    }
 
-    // 2. If already logged in and visits /login or /signup, auto-redirect to their exact dashboard
-    if (user && (isLoginPage || isSignupPage) && request.nextUrl.pathname !== '/admin/login') {
-      let dest = '/dashboard'
-      if (userRole === 'admin') dest = '/admin'
-      else if (userRole === 'provider') dest = '/provider'
+          if (userRole !== 'admin') {
+            const provRes = await fetch(
+              `${url}/rest/v1/provider_profiles?user_id=eq.${user.id}&select=id`,
+              {
+                headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+              }
+            )
+            const provData = await provRes.json()
+            if (provData?.[0]?.id) {
+              userRole = 'provider'
+            }
+          }
+        } catch {}
+      }
 
-      return NextResponse.redirect(new URL(dest, request.url))
-    }
+      if (userRole) {
+        roleCache.set(user.id, { role: userRole, ts: Date.now() })
+      }
 
-    // 3. Role-based portal protection and auto-routing for authenticated users
-    if (user) {
-      const isDashboardPath = request.nextUrl.pathname.startsWith('/dashboard')
-      const isProviderPath = request.nextUrl.pathname.startsWith('/provider')
-      const isAdminPath = request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin/login'
+      // Redirect if visiting login/signup while already authenticated
+      if (isLoginPage || isSignupPage) {
+        let dest = '/dashboard'
+        if (userRole === 'admin') dest = '/admin'
+        else if (userRole === 'provider') dest = '/provider'
+        return NextResponse.redirect(new URL(dest, request.url))
+      }
 
-      // 3.1. Providers visiting customer portal (/dashboard) -> redirect to Provider Portal
-      if (isDashboardPath && userRole === 'provider') {
+      // Role boundary auto-routing
+      if (pathname.startsWith('/dashboard') && userRole === 'provider') {
         return NextResponse.redirect(new URL('/provider', request.url))
       }
-
-      // 3.2. Customers visiting Provider portal -> redirect to Customer Dashboard
-      if (isProviderPath && userRole === 'customer') {
+      if (pathname.startsWith('/provider') && userRole === 'customer') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
-
-      // 3.3. Non-admins visiting Admin portal -> redirect to their own portal
-      if (isAdminPath && userRole !== 'admin') {
-        let dest = '/dashboard'
-        if (userRole === 'provider') dest = '/provider'
+      if (pathname.startsWith('/admin') && pathname !== '/admin/login' && userRole !== 'admin') {
+        let dest = userRole === 'provider' ? '/provider' : '/dashboard'
         return NextResponse.redirect(new URL(dest, request.url))
       }
     }

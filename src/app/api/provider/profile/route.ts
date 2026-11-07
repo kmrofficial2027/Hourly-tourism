@@ -3,6 +3,10 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 
 export const dynamic = 'force-dynamic'
 
+// High-speed short-lived in-memory cache for provider profiles (10s TTL)
+const profileCache = new Map<string, { data: any; ts: number }>()
+const PROFILE_CACHE_TTL = 10 * 1000
+
 // GET: Fetch provider profile details and current online/offline status
 export async function GET() {
   try {
@@ -15,21 +19,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const cached = profileCache.get(user.id)
+    if (cached && Date.now() - cached.ts < PROFILE_CACHE_TTL) {
+      return NextResponse.json(cached.data)
+    }
+
     const adminSupabase = await createAdminSupabaseClient()
 
-    // 1. Fetch provider profile
-    let { data: providerProfile } = await adminSupabase
-      .from('provider_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    // 1 & 2. Fetch provider profile and base profile in parallel
+    const [provRes, userRes] = await Promise.all([
+      adminSupabase.from('provider_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      adminSupabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+    ])
 
-    // 2. Fetch base user profile
-    const { data: userProfile } = await adminSupabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+    let providerProfile = provRes.data
+    const userProfile = userRes.data
 
     // 3. Fallback or initialize provider profile if missing
     if (!providerProfile) {
@@ -56,27 +60,21 @@ export async function GET() {
         ? docs.is_online
         : userProfile?.is_active ?? true
 
-    // 4. Fetch counts of provider's listings
+    // 4. Fetch counts of provider's listings in parallel
     let totalListings = 0
     let activeListings = 0
 
     if (providerId) {
-      const { count: totalCount } = await adminSupabase
-        .from('service_listings')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider_id', providerId)
+      const [totalRes, activeRes] = await Promise.all([
+        adminSupabase.from('service_listings').select('*', { count: 'exact', head: true }).eq('provider_id', providerId),
+        adminSupabase.from('service_listings').select('*', { count: 'exact', head: true }).eq('provider_id', providerId).eq('status', 'active'),
+      ])
 
-      const { count: activeCount } = await adminSupabase
-        .from('service_listings')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider_id', providerId)
-        .eq('status', 'active')
-
-      totalListings = totalCount || 0
-      activeListings = activeCount || 0
+      totalListings = totalRes.count || 0
+      activeListings = activeRes.count || 0
     }
 
-    return NextResponse.json({
+    const responsePayload = {
       success: true,
       businessName: providerProfile?.business_name || userProfile?.full_name || '',
       phone: userProfile?.phone || providerProfile?.address || '',
@@ -86,7 +84,10 @@ export async function GET() {
       totalListings,
       activeListings,
       verificationStatus: providerProfile?.verification_status || 'pending',
-    })
+    }
+
+    profileCache.set(user.id, { data: responsePayload, ts: Date.now() })
+    return NextResponse.json(responsePayload)
   } catch (err: any) {
     console.error('Provider profile GET error:', err)
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
@@ -215,20 +216,17 @@ export async function POST(request: Request) {
     let totalListings = 0
 
     if (providerId) {
-      const { count: totalCount } = await adminSupabase
-        .from('service_listings')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider_id', providerId)
+      const [totalCountRes, activeCountRes] = await Promise.all([
+        adminSupabase.from('service_listings').select('*', { count: 'exact', head: true }).eq('provider_id', providerId),
+        adminSupabase.from('service_listings').select('*', { count: 'exact', head: true }).eq('provider_id', providerId).eq('status', 'active'),
+      ])
 
-      const { count: activeCount } = await adminSupabase
-        .from('service_listings')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider_id', providerId)
-        .eq('status', 'active')
-
-      totalListings = totalCount || 0
-      activeListings = activeCount || 0
+      totalListings = totalCountRes.count || 0
+      activeListings = activeCountRes.count || 0
     }
+
+    // Invalidate profile cache
+    profileCache.delete(user.id)
 
     return NextResponse.json({
       success: true,
@@ -244,4 +242,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
   }
 }
-

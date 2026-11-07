@@ -3,9 +3,14 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { normalizeListingImages } from '@/lib/utils'
 import { DEFAULT_DESTINATIONS } from '@/lib/destinations'
 
+export const dynamic = 'force-dynamic'
+
+// High-speed short-lived in-memory cache for public marketplace browse (15s TTL)
+const servicesCache = new Map<string, { listings: any[]; ts: number }>()
+const SERVICES_CACHE_TTL = 15 * 1000
+
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerSupabaseClient()
     const { searchParams } = new URL(request.url)
 
     const category = searchParams.get('category')
@@ -17,10 +22,24 @@ export async function GET(request: Request) {
     const scope = searchParams.get('scope') // 'admin' | 'provider' | null
     const all = searchParams.get('all') === 'true'
 
+    const isPublic = !scope && !all
+    const cacheKey = request.url
+    if (isPublic) {
+      const cached = servicesCache.get(cacheKey)
+      if (cached && Date.now() - cached.ts < SERVICES_CACHE_TTL) {
+        return NextResponse.json({ listings: cached.listings })
+      }
+    }
+
     const adminSupabase = await createAdminSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    let user: any = null
+
+    // Only inspect authentication if requested scope requires it
+    if (scope === 'admin' || scope === 'provider' || all) {
+      const supabase = await createServerSupabaseClient()
+      const { data: authData } = await supabase.auth.getUser()
+      user = authData?.user || null
+    }
 
     let query = adminSupabase
       .from('service_listings')
@@ -126,6 +145,10 @@ export async function GET(request: Request) {
       normalizedListings = normalizedListings.filter((l: any) => !l.is_expired)
     }
 
+    if (isPublic) {
+      servicesCache.set(cacheKey, { listings: normalizedListings, ts: Date.now() })
+    }
+
     return NextResponse.json({ listings: normalizedListings })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -134,6 +157,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    servicesCache.clear()
     const supabase = await createServerSupabaseClient()
     const {
       data: { user },

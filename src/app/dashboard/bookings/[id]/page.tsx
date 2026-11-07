@@ -21,6 +21,7 @@ import {
   CreditCard,
   HelpCircle,
   XCircle,
+  Navigation,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
@@ -37,6 +38,7 @@ import { formatCurrency, formatDate, normalizeListingImages } from '@/lib/utils'
 import { printBookingInvoice } from '@/lib/invoiceUtils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRealtimeBooking } from '@/hooks/useRealtimeBooking'
+import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
 
 export default function CustomerBookingDetailPage() {
   const params = useParams()
@@ -52,6 +54,7 @@ export default function CustomerBookingDetailPage() {
   const [showChatModal, setShowChatModal] = useState(false)
   const [showDisputeModal, setShowDisputeModal] = useState(false)
   const [showSOSModal, setShowSOSModal] = useState(false)
+  const [showTrackingModal, setShowTrackingModal] = useState(false)
 
   // Real-time Supabase sync for live booking status
   const { isConnected: realtimeConnected } = useRealtimeBooking(bookingId, () => {
@@ -265,15 +268,62 @@ export default function CustomerBookingDetailPage() {
             </div>
 
             {/* Host Communication & Contact Card */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-black text-gray-900">Host Contact & Trip Messaging</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Direct communication is unlocked for confirmed hourly reservations.
-                </p>
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#0a4d29] text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                  🚗
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-sm font-black text-gray-900">
+                      {booking.host_contact?.name || booking.host_contact?.businessName || provider.business_name || 'Verified Dedicated Host'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-[#0a4d29]">
+                      Verified
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Operating in {booking.host_contact?.city || listing.destination_city || 'Tamil Nadu'}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {(booking.host_contact?.phone || provider.phone) && (
+                  <>
+                    <a
+                      href={`tel:${booking.host_contact?.phone || provider.phone}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-800 border border-emerald-300 text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs"
+                      title="Call host directly"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Call Host</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${(booking.host_contact?.phone || provider.phone).replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition-colors shadow-xs"
+                      title="WhatsApp Chat"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </>
+                )}
+
+                {['confirmed', 'in_progress'].includes(booking.status) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowTrackingModal(true)}
+                    className="bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-bold"
+                  >
+                    <Navigation className="w-3.5 h-3.5 mr-1 text-emerald-600 animate-pulse" />
+                    Live Trip Radar
+                  </Button>
+                )}
+
                 <Button
                   variant="primary"
                   size="sm"
@@ -281,7 +331,7 @@ export default function CustomerBookingDetailPage() {
                   className="bg-[#0a4d29] hover:bg-[#07361c]"
                 >
                   <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
-                  Chat with Host
+                  Chat In-App
                 </Button>
               </div>
             </div>
@@ -447,6 +497,15 @@ export default function CustomerBookingDetailPage() {
           onClose={() => setShowSOSModal(false)}
           bookingId={booking.id}
           bookingNumber={booking.booking_number}
+        />
+      )}
+
+      {showTrackingModal && (
+        <LiveTripTrackingModal
+          isOpen={true}
+          onClose={() => setShowTrackingModal(false)}
+          booking={booking}
+          role="customer"
         />
       )}
     </DashboardLayout>

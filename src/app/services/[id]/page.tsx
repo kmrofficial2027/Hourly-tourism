@@ -21,6 +21,10 @@ import {
   MessageCircle,
   Sparkles,
   Compass,
+  Phone,
+  AlertCircle,
+  FileText,
+  CheckCircle2,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -30,6 +34,7 @@ import { MapDisplay } from '@/components/maps/MapDisplay'
 import { Avatar } from '@/components/ui/Avatar'
 import { Rating } from '@/components/ui/Rating'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { FullPageLoader } from '@/components/ui/LoadingSpinner'
 import { CURRENCY_SYMBOL } from '@/lib/constants'
 import { normalizeListingImages } from '@/lib/utils'
@@ -1086,6 +1091,7 @@ export default function ServiceDetailPage() {
   const [listing, setListing] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [showContactHostModal, setShowContactHostModal] = useState(false)
 
   useEffect(() => {
     async function fetchListing() {
@@ -1149,6 +1155,41 @@ export default function ServiceDetailPage() {
   }
 
   const images = normalizeListingImages(listing.images, listing.category)
+
+  // Extract clean human-readable terms & conditions
+  let parsedTerms = ''
+  let parsedCancellation = listing?.cancellation_policy || ''
+
+  if (listing?.terms_and_conditions) {
+    if (typeof listing.terms_and_conditions === 'string') {
+      if (listing.terms_and_conditions.trim().startsWith('{')) {
+        try {
+          const meta = JSON.parse(listing.terms_and_conditions)
+          parsedTerms = meta.rental_terms || meta.trip_terms || meta.terms || ''
+          if (meta.cancellation_policy && !parsedCancellation) {
+            parsedCancellation = meta.cancellation_policy
+          }
+        } catch {
+          parsedTerms = listing.terms_and_conditions
+        }
+      } else {
+        parsedTerms = listing.terms_and_conditions
+      }
+    } else if (typeof listing.terms_and_conditions === 'object') {
+      parsedTerms = listing.terms_and_conditions.rental_terms || listing.terms_and_conditions.trip_terms || listing.terms_and_conditions.terms || ''
+      if (listing.terms_and_conditions.cancellation_policy && !parsedCancellation) {
+        parsedCancellation = listing.terms_and_conditions.cancellation_policy
+      }
+    }
+  }
+
+  if (!parsedTerms) {
+    parsedTerms = 'Dedicated personal vehicle & verified host provided for the entire booked duration. Doorstep or hotel meeting point punctual pickup. Zero surge pricing guarantee.'
+  }
+
+  if (!parsedCancellation) {
+    parsedCancellation = 'Free cancellation up to 4 hours prior to scheduled trip start time. 50% refund for cancellations within 4 hours. Non-refundable once trip starts.'
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50/50">
@@ -1253,7 +1294,7 @@ export default function ServiceDetailPage() {
               </div>
 
               <button
-                onClick={() => alert(`Contacting host: ${listing.provider?.business_name || 'Support'}`)}
+                onClick={() => setShowContactHostModal(true)}
                 className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-orange-50 hover:border-orange-300 hover:text-[#ff7a00] transition-colors"
               >
                 <MessageCircle className="w-4 h-4 mr-1.5 text-[#ff7a00]" />
@@ -1564,11 +1605,113 @@ export default function ServiceDetailPage() {
             </div>
 
             {/* Terms and Policies */}
-            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-4 text-xs text-gray-500">
-              <h3 className="font-bold text-gray-900 text-sm">Terms & Cancellation Policy</h3>
-              <p>{listing.terms_and_conditions}</p>
-              <div className="p-3 rounded-2xl bg-green-50/60 border border-green-200/60 text-[#0a4d29] font-medium">
-                {listing.cancellation_policy}
+            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-gray-100 shadow-sm space-y-6 text-xs text-gray-600">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#ff7a00] flex items-center justify-center font-bold">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm font-display">Terms & Cancellation Policy</h3>
+                    <p className="text-[11px] text-gray-400">Clear, transparent rules with 100% Escrow Protection</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-[#0a4d29] flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  Escrow Protected
+                </span>
+              </div>
+
+              {/* Core Hourly Booking Inclusions & Terms */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-gray-700">
+                  Hourly Tourism Standard Booking Terms
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="flex items-start space-x-2.5 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                    <span className="text-base shrink-0">⛽</span>
+                    <div>
+                      <p className="font-bold text-gray-900 text-xs">Fuel & Maintenance Included</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Zero extra fuel charges for all planned route mileage during your booked hours.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                    <span className="text-base shrink-0">🚗</span>
+                    <div>
+                      <p className="font-bold text-gray-900 text-xs">Dedicated Local Host</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Your personal host & vehicle stay exclusively with your group for the reserved time.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                    <span className="text-base shrink-0">🛡️</span>
+                    <div>
+                      <p className="font-bold text-gray-900 text-xs">Zero Surge Pricing</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Guaranteed flat hourly rate with no peak-hour spikes or hidden platform fees.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                    <span className="text-base shrink-0">⏱️</span>
+                    <div>
+                      <p className="font-bold text-gray-900 text-xs">Flexible Overtime Billing</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Need more time? Extend in 1-hour increments directly with your host at standard rate.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Specific Listing Terms */}
+                {parsedTerms && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/70 text-amber-950 space-y-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      Host Experience Notes & Guidelines:
+                    </span>
+                    <p className="text-xs leading-relaxed text-amber-900">{parsedTerms}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Tiered Cancellation & Refund Policy */}
+              <div className="space-y-3 pt-2">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-gray-700">
+                  Tiered Cancellation & Refund Policy
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">&gt; 4 Hours Notice</span>
+                    <span className="text-lg font-black text-emerald-800 block">100% Refund</span>
+                    <span className="text-[10px] text-emerald-600 block">Zero fee cancellation</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-yellow-50 border border-yellow-200 text-center space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-yellow-800 block">2 – 4 Hours Notice</span>
+                    <span className="text-lg font-black text-yellow-900 block">75% Refund</span>
+                    <span className="text-[10px] text-yellow-700 block">Minor host prep fee</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-orange-50 border border-orange-200 text-center space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-orange-800 block">&lt; 2 Hours Notice</span>
+                    <span className="text-lg font-black text-orange-900 block">50% Refund</span>
+                    <span className="text-[10px] text-orange-700 block">Late cancellation</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-rose-800 block">After Start Time</span>
+                    <span className="text-lg font-black text-rose-900 block">No Refund</span>
+                    <span className="text-[10px] text-rose-700 block">Host dispatched</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-[#0a4d29] flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                  <p className="text-xs leading-relaxed">
+                    <strong>100% Escrow Protection:</strong> Your funds are held securely until the ride begins. 
+                    The host receives payment only after you meet and verify your 4-digit Ride Start OTP. {parsedCancellation}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1612,6 +1755,74 @@ export default function ServiceDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Contact Host Modal */}
+      {showContactHostModal && (
+        <Modal
+          isOpen={showContactHostModal}
+          onClose={() => setShowContactHostModal(false)}
+          title="Contact Verified Host"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex items-center space-x-3">
+              <Avatar
+                src={listing.provider?.avatar_url || null}
+                name={listing.provider?.business_name || 'Host'}
+                size="md"
+              />
+              <div>
+                <h4 className="font-bold text-sm text-emerald-950">
+                  {listing.provider?.business_name || 'Verified Tourism Host'}
+                </h4>
+                <p className="text-xs text-emerald-800">
+                  {listing.destination_city}, {listing.destination_state || 'Tamil Nadu'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <a
+                href={`tel:${listing.provider?.phone || '+919488312345'}`}
+                className="flex items-center justify-between p-3.5 rounded-2xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all font-bold text-gray-800"
+              >
+                <span className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-[#0a4d29]" />
+                  <span>Call Direct: {listing.provider?.phone || '+91 94883 12345'}</span>
+                </span>
+                <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  Instant
+                </span>
+              </a>
+
+              <a
+                href={`https://wa.me/${(listing.provider?.phone || '919488312345').replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3.5 rounded-2xl border border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700 transition-all font-bold"
+              >
+                <span className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat on WhatsApp</span>
+                </span>
+                <span className="text-[10px] uppercase font-bold text-emerald-100 bg-white/20 px-2 py-0.5 rounded-full">
+                  Online
+                </span>
+              </a>
+            </div>
+
+            <p className="text-[11px] text-gray-400 text-center">
+              Available 7:00 AM – 10:00 PM • Average response time under 5 minutes
+            </p>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="secondary" size="sm" onClick={() => setShowContactHostModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <Footer />
     </div>

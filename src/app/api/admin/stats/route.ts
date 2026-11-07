@@ -4,11 +4,21 @@ import { getActiveDestinations } from '@/lib/destinations'
 
 export const dynamic = 'force-dynamic'
 
+// High-speed short-lived in-memory cache for admin dashboard analytics (15s TTL)
+const statsCache = new Map<string, { data: any; ts: number }>()
+const STATS_CACHE_TTL = 15 * 1000
+
 export async function GET(request: Request) {
   try {
-    const adminSupabase = await createAdminSupabaseClient()
     const { searchParams } = new URL(request.url)
     const range = searchParams.get('range') || 'all'
+
+    const cached = statsCache.get(range)
+    if (cached && Date.now() - cached.ts < STATS_CACHE_TTL) {
+      return NextResponse.json(cached.data)
+    }
+
+    const adminSupabase = await createAdminSupabaseClient()
 
     // Compute date cutoff based on range parameter
     let dateCutoff: string | null = null
@@ -217,33 +227,34 @@ export async function GET(request: Request) {
         ? (((cancelledBookings) / totalBookings) * 100).toFixed(1)
         : '0.0'
 
-    return NextResponse.json(
-      {
-        stats: {
-          totalCustomers: totalCustomers || 0,
-          totalProviders: totalProviders || 0,
-          totalCompanies: totalCompanies || 0,
-          totalListings: totalListings || 0,
-          totalBookings,
-          completedBookings,
-          cancelledBookings,
-          pendingApprovals: pendingApprovals || 0,
-          grossBookingValue,
-          totalPlatformCommission,
-          aov,
-          takeRate,
-          completionRate,
-          cancellationRate,
-          categories: categoriesArray,
-          cities: citiesArray,
-        },
+    const responsePayload = {
+      stats: {
+        totalCustomers: totalCustomers || 0,
+        totalProviders: totalProviders || 0,
+        totalCompanies: totalCompanies || 0,
+        totalListings: totalListings || 0,
+        totalBookings,
+        completedBookings,
+        cancelledBookings,
+        pendingApprovals: pendingApprovals || 0,
+        grossBookingValue,
+        totalPlatformCommission,
+        aov,
+        takeRate,
+        completionRate,
+        cancellationRate,
+        categories: categoriesArray,
+        cities: citiesArray,
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      }
-    )
+    }
+
+    statsCache.set(range, { data: responsePayload, ts: Date.now() })
+
+    return NextResponse.json(responsePayload, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    })
   } catch (err: any) {
     console.error('Admin stats route error:', err)
     return NextResponse.json({

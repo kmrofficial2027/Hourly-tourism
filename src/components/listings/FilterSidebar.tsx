@@ -39,7 +39,7 @@ export function FilterSidebar({
   useEffect(() => {
     async function loadActiveCities() {
       try {
-        const res = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch('/api/destinations')
         if (res.ok) {
           const data = await res.json()
           if (data.destinations?.length > 0) {

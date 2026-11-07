@@ -11,7 +11,7 @@ export function LovedByTouristsSection() {
   useEffect(() => {
     async function loadReviews() {
       try {
-        const res = await fetch(`/api/homepage-reviews?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch('/api/homepage-reviews')
         if (res.ok) {
           const data = await res.json()
           if (Array.isArray(data.reviews) && data.reviews.length > 0) {

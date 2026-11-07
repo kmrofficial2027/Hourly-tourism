@@ -211,7 +211,6 @@ export async function PATCH(
     if (excludedServices !== undefined) updatePayload.excluded_services = excludedServices
     if (status !== undefined) {
       updatePayload.status = status
-      updatePayload.is_active = (status === 'active')
     }
 
     const { data: updatedListing, error: updateError } = await adminSupabase

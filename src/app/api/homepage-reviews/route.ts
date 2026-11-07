@@ -7,9 +7,21 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+let cachedReviews: HomepageShowcaseReview[] | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 60 * 1000
+
 // GET: Public fetch of homepage showcase reviews
 export async function GET() {
   try {
+    const now = Date.now()
+    if (cachedReviews && now - cacheTimestamp < CACHE_TTL_MS) {
+      return NextResponse.json(
+        { success: true, reviews: cachedReviews },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+      )
+    }
+
     const adminSupabase = await createAdminSupabaseClient()
     const { data: setting } = await adminSupabase
       .from('platform_settings')
@@ -22,7 +34,13 @@ export async function GET() {
       reviews = setting.value
     }
 
-    return NextResponse.json({ success: true, reviews })
+    cachedReviews = reviews
+    cacheTimestamp = now
+
+    return NextResponse.json(
+      { success: true, reviews },
+      { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+    )
   } catch (err: any) {
     console.error('Homepage reviews GET error:', err)
     return NextResponse.json({ success: true, reviews: DEFAULT_HOMEPAGE_REVIEWS })
@@ -59,25 +77,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Reviews must be an array' }, { status: 400 })
     }
 
-    await adminSupabase.from('platform_settings').upsert(
-      {
-        key: 'homepage_reviews',
-        value: reviews,
-        description: 'Homepage Showcase Reviews (Loved by Tourists Across India)',
-        updated_at: new Date().toISOString(),
-        updated_by: user.id,
-      },
-      { onConflict: 'key' }
-    )
+    // Invalidate cache
+    cachedReviews = null
+    cacheTimestamp = 0
+
+    const { data: existing } = await adminSupabase
+      .from('platform_settings')
+      .select('id')
+      .eq('key', 'homepage_reviews')
+      .maybeSingle()
+
+    let saveErr = null
+    if (existing?.id) {
+      const { error } = await adminSupabase
+        .from('platform_settings')
+        .update({
+          value: reviews,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+      saveErr = error
+    } else {
+      const { error } = await adminSupabase
+        .from('platform_settings')
+        .insert({
+          key: 'homepage_reviews',
+          value: reviews,
+          category: 'homepage',
+          description: 'Homepage Loved by Tourists real-time showcase reviews',
+          is_public: true,
+        })
+      saveErr = error
+    }
+
+    if (saveErr) {
+      console.error('Error saving homepage reviews settings:', saveErr)
+      return NextResponse.json({ error: saveErr.message }, { status: 500 })
+    }
+
+    cachedReviews = reviews
+    cacheTimestamp = Date.now()
 
     return NextResponse.json({
       success: true,
+      message: 'Showcase reviews updated successfully!',
       reviews,
-      message: 'Homepage showcase reviews updated successfully!',
     })
   } catch (err: any) {
     console.error('Homepage reviews POST error:', err)
-    return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Failed to save settings' }, { status: 500 })
   }
 }
-

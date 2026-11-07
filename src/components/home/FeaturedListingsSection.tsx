@@ -29,7 +29,7 @@ export function FeaturedListingsSection() {
     async function loadData() {
       try {
         // 1. Fetch live active/launched destinations
-        const destRes = await fetch(`/api/destinations?t=${Date.now()}`, { cache: 'no-store' })
+        const destRes = await fetch('/api/destinations')
         if (destRes.ok) {
           const dData = await destRes.json()
           if (dData.destinations?.length > 0) {
@@ -38,7 +38,7 @@ export function FeaturedListingsSection() {
         }
 
         // 2. Fetch homepage showcase hosts and region bundle copy
-        const featRes = await fetch(`/api/homepage-featured?t=${Date.now()}`, { cache: 'no-store' })
+        const featRes = await fetch('/api/homepage-featured')
         if (featRes.ok) {
           const fData = await featRes.json()
           if (fData.settings) {

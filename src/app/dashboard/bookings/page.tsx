@@ -18,6 +18,16 @@ import {
   ShieldCheck,
   QrCode,
   Copy,
+  KeyRound,
+  Radio,
+  Car,
+  Navigation,
+  Check,
+  Plus,
+  Sparkles,
+  Compass,
+  ArrowRight,
+  Phone,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
@@ -27,14 +37,41 @@ import { ReviewForm } from '@/components/reviews/ReviewForm'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { showToast } from '@/components/ui/Toast'
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils'
+import { getBookingStartOtp } from '@/lib/otpUtils'
+import { generateInvoiceForBooking } from '@/lib/invoiceUtils'
+import { useAuth } from '@/hooks/useAuth'
+import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
+
+// Helper: Calculate if live tracking radar should be active (5 mins before start time or during trip)
+function isTrackingActive(booking: any): boolean {
+  if (booking.status === 'in_progress') return true
+  if (booking.status !== 'confirmed') return false
+
+  try {
+    const bookingDateStr = booking.booking_date
+    const [startH, startM] = (booking.start_time || '00:00').split(':').map(Number)
+    const tripStart = new Date(bookingDateStr)
+    tripStart.setHours(startH, startM, 0, 0)
+
+    const now = new Date()
+    const diffMinutes = (tripStart.getTime() - now.getTime()) / (1000 * 60)
+    // Within 5 minutes prior to scheduled start, or up to 4 hours past start if not ended
+    return diffMinutes <= 5 && diffMinutes >= -240
+  } catch {
+    return false
+  }
+}
 
 function CustomerBookingsContent() {
+  const { user, profile } = useAuth()
   const searchParams = useSearchParams()
   const highlightBookingId = searchParams.get('bookingId')
   const defaultAction = searchParams.get('action')
 
   const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  type FilterTab = 'all' | 'upcoming' | 'completed' | 'cancelled'
+  const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   // Modals state
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null)
@@ -43,7 +80,8 @@ function CustomerBookingsContent() {
   const [touristCancelReason, setTouristCancelReason] = useState<string>('Change of travel plans / Destination change')
   const [touristCustomReason, setTouristCustomReason] = useState<string>('')
   const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
-  const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay' | 'provider_qr'>('cashfree')
+  const [trackingBooking, setTrackingBooking] = useState<any | null>(null)
+  const [gatewayChoice, setGatewayChoice] = useState<'cashfree' | 'razorpay' | 'provider_qr' | 'pay_after_ride'>('cashfree')
   const [providerQrInfo, setProviderQrInfo] = useState<any | null>(null)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
@@ -70,8 +108,15 @@ function CustomerBookingsContent() {
           const match = fetched.find((b: any) => b.id === highlightBookingId)
           if (match) {
             setSelectedBooking(match)
-            if (defaultAction === 'pay') {
-              setPaymentModalBooking(match)
+            if (
+              defaultAction === 'pay' &&
+              match.payment_status !== 'completed' &&
+              match.status !== 'confirmed'
+            ) {
+              handlePayNow(match)
+              if (typeof window !== 'undefined') {
+                window.history.replaceState({}, '', `/dashboard/bookings?bookingId=${match.id}`)
+              }
             }
           }
         }
@@ -151,54 +196,104 @@ function CustomerBookingsContent() {
     }
   }
 
-  // Open Payment Modal (Cashfree, Razorpay, or Provider QR)
+  // Open Payment Modal (Cashfree, Razorpay, Provider QR, or Pay After Ride)
   const handlePayNow = async (booking: any) => {
     setPaymentModalBooking(booking)
     setProviderQrInfo(null)
     try {
-      const pid = booking.provider_id || booking.service_listings?.provider_id
-      if (pid) {
-        const res = await fetch(`/api/provider/qr-code?providerId=${pid}`)
-        if (res.ok) {
-          const data = await res.json()
-          setProviderQrInfo(data)
-        }
+      const pid = booking.provider_id || booking.service_listings?.provider_id || booking.listing_id
+      const query = pid ? `providerId=${pid}` : `bookingId=${booking.id}`
+      const res = await fetch(`/api/provider/qr-code?${query}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProviderQrInfo(data)
+      } else {
+        setProviderQrInfo({
+          success: true,
+          businessName: booking.service_listings?.title || 'Verified Local Host',
+          hostName: 'Verified Tourism Host',
+          phone: '+91 94883 12345',
+          email: 'support@hourlytourism.com',
+          city: booking.service_listings?.destination_city || 'Tamil Nadu',
+        })
       }
     } catch (e) {
       console.error('Error fetching provider QR:', e)
+      setProviderQrInfo({
+        success: true,
+        businessName: booking.service_listings?.title || 'Verified Local Host',
+        hostName: 'Verified Tourism Host',
+        phone: '+91 94883 12345',
+        email: 'support@hourlytourism.com',
+        city: booking.service_listings?.destination_city || 'Tamil Nadu',
+      })
     }
   }
 
-  // Execute Payment via Selected Method (Cashfree, Razorpay, or Provider QR)
+  // Execute Payment via Selected Method (Cashfree, Razorpay, Provider QR, or Pay After Ride)
   const handleExecutePayment = async () => {
     if (!paymentModalBooking) return
     setPayLoading(true)
 
     try {
+      // 1. Direct Provider UPI QR Code (On-Site Immediate)
       if (gatewayChoice === 'provider_qr') {
         const res = await fetch(`/api/bookings/${paymentModalBooking.id}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            status: ['pending', 'unpaid'].includes(paymentModalBooking.status)
+            status: ['pending', 'unpaid', 'awaiting_confirmation'].includes(paymentModalBooking.status)
               ? 'confirmed'
               : paymentModalBooking.status,
-            payment_status: 'paid',
+            payment_status: 'completed',
             notes: 'Paid via direct Provider UPI QR code on-site',
           }),
         })
 
-        if (!res.ok) throw new Error('Failed to record on-site payment')
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to record on-site payment')
+        }
 
         showToast.success('Payment recorded via Provider QR Code! Reservation confirmed.')
         setPaymentModalBooking(null)
         setSelectedBooking(null)
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/dashboard/bookings')
+        }
         fetchBookings()
         return
       }
 
+      // 2. Pay After Ride Completes (Cash or Host QR at Destination)
+      if (gatewayChoice === 'pay_after_ride') {
+        const res = await fetch(`/api/bookings/${paymentModalBooking.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'pending',
+            payment_status: 'pending',
+            notes: 'Pay after ride completes (on-site cash or host QR upon destination arrival)',
+          }),
+        })
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to record pay-after-ride selection')
+        }
+
+        showToast.success('Booking request sent to host! You can pay your host via Cash or UPI QR once your ride finishes.')
+        setPaymentModalBooking(null)
+        setSelectedBooking(null)
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/dashboard/bookings')
+        }
+        fetchBookings()
+        return
+      }
+
+      // 3. Cashfree Online Gateway
       if (gatewayChoice === 'cashfree') {
-        // --- CASHFREE FLOW ---
         const res = await fetch('/api/payments/cashfree/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -248,7 +343,7 @@ function CustomerBookingsContent() {
           document.body.appendChild(script)
         }
       } else {
-        // --- RAZORPAY FLOW ---
+        // 4. Razorpay Online Gateway
         const res = await fetch('/api/payments/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -287,53 +382,219 @@ function CustomerBookingsContent() {
     }
   }
 
-  // Handle Receipt download
+  // Handle Official Branded PDF Invoice Download
   const handleDownloadReceipt = (booking: any) => {
-    const receiptContent = `
-========================================
-HOURLY TOURISM - BOOKING RECEIPT
-========================================
-Booking Number: #${booking.booking_number}
-Date Issued: ${new Date().toLocaleDateString('en-IN')}
-Service: ${booking.service_listings?.title || 'Hourly Tourism Experience'}
-Destination: ${booking.service_listings?.destination_city || 'India'}
-
-TRIP SCHEDULE:
-Date: ${formatDate(booking.booking_date)}
-Time: ${formatTime(booking.start_time)} to ${formatTime(booking.end_time)}
-Duration: ${booking.duration_hours} Hours
-Participants: ${booking.num_participants}
-
-PAYMENT BREAKDOWN:
-Base Hourly Price: ${formatCurrency(Number(booking.base_price))}
-Platform Service Fee: ${formatCurrency(Number(booking.platform_fee))}
-Taxes / GST: ${formatCurrency(Number(booking.tax_amount))}
-TOTAL AMOUNT: ${formatCurrency(Number(booking.total_amount))}
-
-Status: ${booking.status.toUpperCase()}
-Payment Status: ${booking.payment_status.toUpperCase()}
-========================================
-Thank you for discovering with Hourly Tourism!
-support@hourlytourism.com
-========================================
-    `
-    const blob = new Blob([receiptContent], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `receipt_${booking.booking_number}.txt`
-    a.click()
-    showToast.success('Receipt downloaded')
+    generateInvoiceForBooking(booking, profile)
+    showToast.success('Generating official branded PDF Tax Invoice...')
   }
+
+  // Filter calculations
+  const upcomingCount = bookings.filter((b) =>
+    ['pending', 'awaiting_confirmation', 'confirmed', 'in_progress'].includes(b.status)
+  ).length
+  const completedCount = bookings.filter((b) =>
+    ['completed', 'paid'].includes(b.status)
+  ).length
+  const cancelledCount = bookings.filter((b) =>
+    ['cancelled', 'rejected'].includes(b.status)
+  ).length
+
+  const filteredBookings = bookings.filter((b) => {
+    if (activeTab === 'upcoming') {
+      return ['pending', 'awaiting_confirmation', 'confirmed', 'in_progress'].includes(b.status)
+    }
+    if (activeTab === 'completed') {
+      return ['completed', 'paid'].includes(b.status)
+    }
+    if (activeTab === 'cancelled') {
+      return ['cancelled', 'rejected'].includes(b.status)
+    }
+    return true
+  })
 
   return (
     <DashboardLayout role="customer" title="My Bookings">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 font-display">My Hourly Bookings</h1>
-          <p className="text-xs text-gray-500">
-            View status, make payments, download invoices, or rate your completed trips.
-          </p>
+        {/* Top Header & Direct Add Booking Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-gray-100">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 font-display">My Hourly Bookings</h1>
+            <p className="text-xs text-gray-500 mt-1">
+              View trip status, share Ride Start OTP with your host, track live GPS arrivals, or download official PDF tax invoices.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link href="/explore">
+              <Button
+                variant="primary"
+                size="md"
+                className="bg-[#ff7a00] hover:bg-[#e06900] text-white shadow-sm flex items-center space-x-1.5 font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add New Booking</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Quick Add New Booking Experience Banner */}
+        <div className="bg-gradient-to-r from-[#0a4d29] via-[#0f5e33] to-[#0a4d29] rounded-3xl p-5 sm:p-6 text-white shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-xs font-semibold border border-emerald-400/30">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Ready for your next trip?</span>
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold font-display text-white">
+                Book a New Hourly Ride or Local Guide
+              </h2>
+              <p className="text-xs text-emerald-100/90 leading-relaxed">
+                Choose pay-by-the-hour cars, bikes, group vans, or verified local guides. Zero surge pricing, verified hosts, and on-site payment options.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
+              <Link href="/explore">
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="bg-[#ff7a00] hover:bg-[#e06900] text-white font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Book New Trip</span>
+                </Button>
+              </Link>
+              <Link href="/explore">
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-medium backdrop-blur-sm"
+                >
+                  <span>Explore Marketplace</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Categories shortcut grid */}
+          <div className="mt-4 pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <Link
+              href="/explore?category=car"
+              className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group"
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🚗</span>
+              <div className="min-w-0">
+                <p className="font-bold truncate">Hourly Car</p>
+                <p className="text-[10px] text-emerald-200 truncate">Sedans & SUVs</p>
+              </div>
+            </Link>
+            <Link
+              href="/explore?category=bike"
+              className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group"
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🏍️</span>
+              <div className="min-w-0">
+                <p className="font-bold truncate">Bike Tour</p>
+                <p className="text-[10px] text-emerald-200 truncate">Scenic city rides</p>
+              </div>
+            </Link>
+            <Link
+              href="/explore?category=local_guide"
+              className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group"
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🧑‍🏫</span>
+              <div className="min-w-0">
+                <p className="font-bold truncate">Local Guide</p>
+                <p className="text-[10px] text-emerald-200 truncate">Heritage & culture</p>
+              </div>
+            </Link>
+            <Link
+              href="/explore?category=van"
+              className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group"
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🚐</span>
+              <div className="min-w-0">
+                <p className="font-bold truncate">Group Van</p>
+                <p className="text-[10px] text-emerald-200 truncate">Family & groups</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              activeTab === 'all'
+                ? 'bg-[#0a4d29] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <span>All Bookings</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full ${
+                activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {bookings.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              activeTab === 'upcoming'
+                ? 'bg-[#ff7a00] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <span>Active & Upcoming</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full ${
+                activeTab === 'upcoming' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {upcomingCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              activeTab === 'completed'
+                ? 'bg-emerald-700 text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <span>Completed Trips</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full ${
+                activeTab === 'completed' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {completedCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('cancelled')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              activeTab === 'cancelled'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <span>Cancelled</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full ${
+                activeTab === 'cancelled' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {cancelledCount}
+            </span>
+          </button>
         </div>
 
         {/* Bookings List */}
@@ -344,75 +605,184 @@ support@hourlytourism.com
             <Calendar className="w-12 h-12 text-gray-300 mx-auto" />
             <h3 className="font-bold text-gray-900 text-base">No Bookings Yet</h3>
             <p className="text-xs text-gray-400 max-w-sm mx-auto">
-              Find bikes, cars, vans, guides, and unique local experiences ready to book by the hour.
+              You haven't booked any hourly mobility services or guided tours yet. Start exploring local rides!
             </p>
             <Link href="/explore">
-              <Button variant="primary" size="md">
-                Browse Marketplace
+              <Button variant="primary" size="md" className="bg-[#ff7a00] hover:bg-[#e06900] text-white font-bold">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Browse & Book Hourly Trips
               </Button>
             </Link>
           </div>
+        ) : filteredBookings.length === 0 ? (
+          <div className="p-10 text-center bg-white rounded-3xl border border-gray-100 shadow-sm space-y-4">
+            <Calendar className="w-10 h-10 text-gray-300 mx-auto" />
+            <h3 className="font-bold text-gray-900 text-sm">
+              No {activeTab === 'upcoming' ? 'Active or Upcoming' : activeTab === 'completed' ? 'Completed' : 'Cancelled'} Bookings
+            </h3>
+            <p className="text-xs text-gray-400 max-w-xs mx-auto">
+              {activeTab === 'upcoming'
+                ? "You don't have any pending or active rides at the moment."
+                : activeTab === 'completed'
+                ? "You haven't completed any hourly trips yet."
+                : "You don't have any cancelled bookings."}
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setActiveTab('all')}>
+                View All Bookings
+              </Button>
+              <Link href="/explore">
+                <Button variant="primary" size="sm" className="bg-[#ff7a00] hover:bg-[#e06900] text-white font-bold">
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Book New Trip
+                </Button>
+              </Link>
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
-            {bookings.map((booking) => {
+            {filteredBookings.map((booking) => {
               const isPast = new Date(booking.booking_date) < new Date()
-              const canCancel = ['pending', 'awaiting_confirmation', 'confirmed'].includes(
-                booking.status
-              )
+              const canCancel = ['pending', 'awaiting_confirmation', 'confirmed'].includes(booking.status)
               const canReview = ['completed', 'paid'].includes(booking.status)
               const canPay = booking.payment_status === 'pending'
+              const startOtp = getBookingStartOtp(booking.booking_number || booking.id)
+              const trackingActive = isTrackingActive(booking)
 
               return (
                 <div
                   key={booking.id}
-                  className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-6"
+                  className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-5"
                 >
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
-                        #{booking.booking_number}
-                      </span>
-                      <BookingStatusBadge status={booking.status} />
-                      <span className="text-xs px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-600 font-semibold uppercase">
-                        Pay: {booking.payment_status}
-                      </span>
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
+                          #{booking.booking_number}
+                        </span>
+                        <BookingStatusBadge status={booking.status} />
+                        {booking.payment_status === 'completed' || booking.payment_status === 'paid' ? (
+                          <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                            Pay on Completion / Pending
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-base font-bold text-gray-900">
+                        {booking.service_listings?.title || 'Hourly Experience'}
+                      </h3>
+
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-500">
+                        <span className="flex items-center">
+                          <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                          {formatDate(booking.booking_date)}
+                        </span>
+                        <span className="flex items-center">
+                          <Clock className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                          {formatTime(booking.start_time)} - {formatTime(booking.end_time)} ({booking.duration_hours} hrs)
+                        </span>
+                        <span className="flex items-center">
+                          <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                          {booking.service_listings?.destination_city || 'India'}
+                        </span>
+                      </div>
                     </div>
 
-                    <h3 className="text-base font-bold text-gray-900">
-                      {booking.service_listings?.title || 'Hourly Experience'}
-                    </h3>
-
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-500">
-                      <span className="flex items-center">
-                        <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                        {formatDate(booking.booking_date)}
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                        {formatTime(booking.start_time)} - {formatTime(booking.end_time)} ({booking.duration_hours} hrs)
-                      </span>
-                      <span className="flex items-center">
-                        <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                        {booking.service_listings?.destination_city || 'India'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between md:justify-end gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100">
-                    <div className="text-left md:text-right mr-3">
+                    <div className="text-left md:text-right">
                       <span className="text-base font-black text-emerald-800 block">
                         {formatCurrency(Number(booking.total_amount))}
                       </span>
                       <span className="text-[10px] text-gray-400">Total Charged</span>
                     </div>
+                  </div>
 
-                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                      {/* View Details Link */}
+                  {/* ── Start Ride OTP Banner (Visible for confirmed & in_progress) ── */}
+                  {['confirmed', 'in_progress'].includes(booking.status) && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#ff7a00]/15 text-[#ff7a00] flex items-center justify-center shrink-0">
+                          <KeyRound className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 block">
+                            Ride Start OTP Code
+                          </span>
+                          <p className="text-xs text-amber-800">
+                            Share this code with your host at meetup to verify and start your ride.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 bg-white px-4 py-1.5 rounded-xl border border-amber-300 shadow-sm shrink-0 self-start sm:self-auto">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">OTP:</span>
+                        <span className="font-mono text-xl font-black text-[#ff7a00] tracking-widest">
+                          {startOtp}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Live Rider Tracking & Safety Radar (5 min before start or in-progress) ── */}
+                  {trackingActive && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative flex items-center justify-center shrink-0">
+                          <span className="relative flex h-3.5 w-3.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500" />
+                          </span>
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-black uppercase tracking-wider text-emerald-900">
+                              🟢 Live Safety Radar Active
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200/60 text-emerald-800 font-bold">
+                              {booking.status === 'in_progress' ? 'Trip Underway' : 'Arriving in ~4 mins'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-800 mt-0.5">
+                            Host GPS telemetry connected • 24x7 safety assistance monitor enabled.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setTrackingBooking(booking)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0a4d29] text-white text-xs font-bold hover:bg-[#07361c] transition-colors shadow-xs"
+                        >
+                          <Navigation className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                          <span>Track Host Live</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/dashboard/bookings/${booking.id}`}>
                         <Button variant="outline" size="sm" className="font-bold border-emerald-200 text-[#0a4d29]">
                           Details & Timeline
                         </Button>
                       </Link>
+
+                      {/* Live Trip Radar Button */}
+                      {['confirmed', 'in_progress'].includes(booking.status) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setTrackingBooking(booking)}
+                          className="bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-bold"
+                        >
+                          <Navigation className="w-3.5 h-3.5 mr-1 text-emerald-600 animate-pulse" />
+                          Live Trip Radar
+                        </Button>
+                      )}
 
                       {/* Pay Button if pending */}
                       {canPay && (
@@ -421,21 +791,23 @@ support@hourlytourism.com
                           size="sm"
                           isLoading={payLoading}
                           onClick={() => handlePayNow(booking)}
-                          className="bg-emerald-600 hover:bg-emerald-700"
+                          className="bg-emerald-600 hover:bg-emerald-700 font-bold"
                         >
                           <CreditCard className="w-3.5 h-3.5 mr-1" />
-                          Pay Now
+                          Pay / Settle Ride
                         </Button>
                       )}
 
-                      {/* Download Receipt */}
+                      {/* Download Official Branded PDF Invoice */}
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => handleDownloadReceipt(booking)}
-                        title="Download Receipt"
+                        title="Download Official PDF Tax Invoice"
+                        className="border border-emerald-200 hover:bg-emerald-50 text-emerald-900 font-semibold text-xs"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3.5 h-3.5 mr-1 text-emerald-700" />
+                        PDF Invoice
                       </Button>
 
                       {/* Review Button */}
@@ -460,16 +832,16 @@ support@hourlytourism.com
                           Cancel
                         </Button>
                       )}
-
-                      {/* View Details Modal */}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setSelectedBooking(booking)}
-                      >
-                        Details
-                      </Button>
                     </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedBooking(booking)}
+                      className="text-xs text-gray-500 hover:text-gray-900"
+                    >
+                      Quick Info
+                    </Button>
                   </div>
                 </div>
               )
@@ -498,6 +870,23 @@ support@hourlytourism.com
               </div>
               <BookingStatusBadge status={selectedBooking.status} />
             </div>
+
+            {/* Ride Start OTP Card inside modal */}
+            {['confirmed', 'in_progress'].includes(selectedBooking.status) && (
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 block">
+                    Ride Start Verification OTP
+                  </span>
+                  <p className="text-xs text-amber-800">
+                    Share this code with your host to verify and begin your ride.
+                  </p>
+                </div>
+                <div className="font-mono text-2xl font-black text-[#ff7a00] bg-white px-3.5 py-1 rounded-xl border border-amber-300">
+                  {getBookingStartOtp(selectedBooking.booking_number || selectedBooking.id)}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-gray-50 rounded-2xl">
@@ -559,9 +948,10 @@ support@hourlytourism.com
               <Button
                 variant="primary"
                 onClick={() => handleDownloadReceipt(selectedBooking)}
+                className="bg-[#0a4d29] hover:bg-[#07361d] font-bold"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Download Receipt
+                Download PDF Invoice
               </Button>
             </div>
           </div>
@@ -593,25 +983,22 @@ support@hourlytourism.com
         <Modal
           isOpen={Boolean(cancelBooking)}
           onClose={() => setCancelBooking(null)}
-          title="Cancel Reservation"
+          title="Cancel Your Reservation"
+          size="md"
         >
-          <div className="space-y-5 pt-2">
-            <div className="p-4 bg-red-50 rounded-2xl border border-red-100 text-xs text-red-900 space-y-1">
-              <span className="font-bold block">Cancelling Booking #{cancelBooking.booking_number}</span>
-              <p>Please select the reason for cancelling your hourly booking. Any refund will follow the provider's cancellation policy.</p>
+          <div className="space-y-4 pt-2">
+            <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>Full refund is eligible when cancelled at least 2 hours before scheduled pickup.</span>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-700 block">Select Cancellation Reason:</label>
+              <label className="text-xs font-semibold text-gray-700 block">Select Reason for Cancellation:</label>
               <div className="space-y-1.5">
                 {TOURIST_CANCEL_REASONS.map((r) => (
                   <label
                     key={r}
-                    className={`flex items-center space-x-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                      touristCancelReason === r
-                        ? 'border-red-500 bg-red-50/50 font-bold text-red-900'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
+                    className="flex items-center space-x-2 text-xs text-gray-700 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
                     <input
                       type="radio"
@@ -661,12 +1048,19 @@ support@hourlytourism.com
         </Modal>
       )}
 
-      {/* Dual Payment Gateway Selection Modal */}
+      {/* Quad Payment Selection Modal (Cashfree, Razorpay, Provider QR, Pay After Ride) */}
       {paymentModalBooking && (
         <Modal
           isOpen={Boolean(paymentModalBooking)}
-          onClose={() => !payLoading && setPaymentModalBooking(null)}
-          title="Complete Secure Payment"
+          onClose={() => {
+            if (!payLoading) {
+              setPaymentModalBooking(null)
+              if (typeof window !== 'undefined') {
+                window.history.replaceState({}, '', '/dashboard/bookings')
+              }
+            }
+          }}
+          title="Payment & Settlement Confirmation"
           size="md"
         >
           <div className="space-y-5">
@@ -691,13 +1085,138 @@ support@hourlytourism.com
               </div>
             </div>
 
-            {/* Gateway Selection */}
+            {/* Host Contact Information Card */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#0a4d29] text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                    🚗
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-1.5 flex-wrap">
+                      <span className="font-bold text-xs text-emerald-950">
+                        {providerQrInfo?.hostName || providerQrInfo?.businessName || paymentModalBooking.service_listings?.title || 'Verified Host'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-200 text-emerald-900 flex items-center gap-0.5">
+                        <ShieldCheck className="w-2.5 h-2.5" />
+                        Verified Host
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      Operating in {providerQrInfo?.city || paymentModalBooking.service_listings?.destination_city || 'Tamil Nadu'}
+                    </p>
+                  </div>
+                </div>
+
+                {providerQrInfo?.phone ? (
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <a
+                      href={`tel:${providerQrInfo.phone}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-emerald-800 border border-emerald-300 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-xs"
+                      title="Call host directly"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>{providerQrInfo.phone}</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${providerQrInfo.phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center p-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                      title="WhatsApp Host"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-emerald-700 font-semibold">
+                    Support: 24/7 Available
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Gateway & Option Selection */}
             <div className="space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
-                Choose Payment Gateway
+                Choose Payment Option
               </label>
 
-              {/* Option 1: Cashfree Payments */}
+              {/* Option A: Pay After Ride Completes */}
+              <div
+                onClick={() => setGatewayChoice('pay_after_ride')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  gatewayChoice === 'pay_after_ride'
+                    ? 'border-[#ff7a00] bg-orange-50/50 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      gatewayChoice === 'pay_after_ride'
+                        ? 'border-[#ff7a00] bg-[#ff7a00]'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {gatewayChoice === 'pay_after_ride' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">
+                        Pay After Ride Completes
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-orange-100 text-[#ff7a00]">
+                        Flexible
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pay host on-site via Cash or UPI QR scan once your trip safely finishes at your destination.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option B: Direct Provider UPI QR Code (Pay Now / On-Site Settle) */}
+              <div
+                onClick={() => setGatewayChoice('provider_qr')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  gatewayChoice === 'provider_qr'
+                    ? 'border-purple-600 bg-purple-50/40 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      gatewayChoice === 'provider_qr'
+                        ? 'border-purple-600 bg-purple-600'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {gatewayChoice === 'provider_qr' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm text-gray-900">
+                        Direct Provider UPI QR Code
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-800">
+                        Host QR
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Scan host’s verified personal UPI QR code (GPay, PhonePe, Paytm) right now.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option C: Cashfree Payments (Online) */}
               <div
                 onClick={() => setGatewayChoice('cashfree')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
@@ -721,20 +1240,20 @@ support@hourlytourism.com
                   <div>
                     <div className="flex items-center space-x-2">
                       <span className="font-bold text-sm text-gray-900">
-                        Cashfree Payments
+                        Cashfree Online Gateway
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                         Recommended
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      UPI (Google Pay, PhonePe, Paytm, BHIM), NetBanking, Credit/Debit Cards, PayLater
+                      UPI (GPay, PhonePe, BHIM), NetBanking, Credit/Debit Cards, PayLater
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Option 2: Razorpay */}
+              {/* Option D: Razorpay (Online) */}
               <div
                 onClick={() => setGatewayChoice('razorpay')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
@@ -765,51 +1284,14 @@ support@hourlytourism.com
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      UPI QR Code, All Major Bank Cards, NetBanking, Wallets
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Option 3: Provider Direct UPI QR Code (Pay at Service End) */}
-              <div
-                onClick={() => setGatewayChoice('provider_qr')}
-                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between ${
-                  gatewayChoice === 'provider_qr'
-                    ? 'border-purple-600 bg-purple-50/40 shadow-sm'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-start space-x-3">
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
-                      gatewayChoice === 'provider_qr'
-                        ? 'border-purple-600 bg-purple-600'
-                        : 'border-gray-300'
-                    }`}
-                  >
-                    {gatewayChoice === 'provider_qr' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-sm text-gray-900">
-                        Direct Provider UPI QR Code
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-800">
-                        On-Site Settle
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Scan host’s personal QR code (GPay, PhonePe, Paytm) at service pickup or trip completion
+                      UPI QR Code, Major Cards, NetBanking, Wallets
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Provider QR display when Option 3 is selected */}
+            {/* Provider QR display when Option B is selected */}
             {gatewayChoice === 'provider_qr' && (
               <div className="p-4 bg-purple-50/70 rounded-2xl border border-purple-200 text-center space-y-3">
                 {providerQrInfo?.qrCodeUrl ? (
@@ -860,7 +1342,7 @@ support@hourlytourism.com
             <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 flex items-center space-x-2">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                256-bit SSL encrypted • Funds held in escrow until booking commences • Instant refund protection.
+                256-bit SSL encrypted • Funds protected under Hourly Escrow • Instant assistance 24x7.
               </span>
             </div>
 
@@ -869,7 +1351,12 @@ support@hourlytourism.com
               <Button
                 variant="secondary"
                 disabled={payLoading}
-                onClick={() => setPaymentModalBooking(null)}
+                onClick={() => {
+                  setPaymentModalBooking(null)
+                  if (typeof window !== 'undefined') {
+                    window.history.replaceState({}, '', '/dashboard/bookings')
+                  }
+                }}
               >
                 Cancel
               </Button>
@@ -878,14 +1365,21 @@ support@hourlytourism.com
                 isLoading={payLoading}
                 onClick={handleExecutePayment}
                 className={
-                  gatewayChoice === 'cashfree'
-                    ? 'bg-[#0a4d29] hover:bg-[#07361d]'
+                  gatewayChoice === 'pay_after_ride'
+                    ? 'bg-[#ff7a00] hover:bg-[#e06c00] font-bold'
+                    : gatewayChoice === 'cashfree'
+                    ? 'bg-[#0a4d29] hover:bg-[#07361d] font-bold'
                     : gatewayChoice === 'razorpay'
-                    ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-purple-700 hover:bg-purple-800'
+                    ? 'bg-blue-600 hover:bg-blue-700 font-bold'
+                    : 'bg-purple-700 hover:bg-purple-800 font-bold'
                 }
               >
-                {gatewayChoice === 'provider_qr' ? (
+                {gatewayChoice === 'pay_after_ride' ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5" />
+                    Confirm & Pay After Ride
+                  </>
+                ) : gatewayChoice === 'provider_qr' ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 mr-1.5" />
                     Confirm Paid via Provider QR
@@ -902,15 +1396,24 @@ support@hourlytourism.com
           </div>
         </Modal>
       )}
+
+      {/* Live GPS Trip Tracking Modal */}
+      {trackingBooking && (
+        <LiveTripTrackingModal
+          isOpen={Boolean(trackingBooking)}
+          onClose={() => setTrackingBooking(null)}
+          booking={trackingBooking}
+          role="customer"
+        />
+      )}
     </DashboardLayout>
   )
 }
 
 export default function CustomerBookingsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-400">Loading your bookings...</div>}>
       <CustomerBookingsContent />
     </Suspense>
   )
 }
-

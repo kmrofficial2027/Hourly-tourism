@@ -35,6 +35,7 @@ import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
 import { showToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils'
 import { useProviderQueue } from '@/hooks/useProviderQueue'
+import { playMildHornBuzzer } from '@/lib/soundUtils'
 
 export default function ProviderOverviewPage() {
   const [stats, setStats] = useState({
@@ -154,6 +155,65 @@ export default function ProviderOverviewPage() {
       showToast.error('Network error changing availability status')
     } finally {
       setTogglingOnline(false)
+    }
+  }
+
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+
+  const handleAcceptRequest = async (bookingId: string) => {
+    setActionLoadingId(bookingId)
+    try {
+      playMildHornBuzzer()
+      const res = await fetch(`/api/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'confirmed' }),
+      })
+      if (res.ok) {
+        showToast.success('Ride confirmed! Tourist notified with Ride Start OTP.')
+        setRecentRequests((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: 'confirmed' } : b))
+        )
+        setStats((prev) => ({
+          ...prev,
+          bookingRequests: Math.max(0, prev.bookingRequests - 1),
+          upcomingBookings: prev.upcomingBookings + 1,
+        }))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        showToast.error(err.error || 'Failed to accept booking')
+      }
+    } catch {
+      showToast.error('Network error accepting booking')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleRejectRequest = async (bookingId: string) => {
+    setActionLoadingId(bookingId)
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', reason: 'Declined by host from overview' }),
+      })
+      if (res.ok) {
+        showToast.success('Booking declined.')
+        setRecentRequests((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: 'rejected' } : b))
+        )
+        setStats((prev) => ({
+          ...prev,
+          bookingRequests: Math.max(0, prev.bookingRequests - 1),
+        }))
+      } else {
+        showToast.error('Failed to decline booking')
+      }
+    } catch {
+      showToast.error('Network error declining booking')
+    } finally {
+      setActionLoadingId(null)
     }
   }
 
@@ -698,22 +758,28 @@ export default function ProviderOverviewPage() {
                       {formatCurrency(Number(b.total_amount))}
                     </span>
                     <div className="flex items-center gap-2">
-                      {b.status === 'pending' ? (
+                      {['pending', 'awaiting_confirmation', 'pending_provider_approval'].includes(b.status) ? (
                         <>
-                          {/* Accept */}
-                          <Link href={`/provider/bookings?id=${b.id}&action=accept`}>
-                            <button className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#0a4d29] to-[#15803d] text-white text-xs font-bold px-3 py-2 shadow-md shadow-green-900/20 hover:-translate-y-0.5 transition-all duration-200">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Accept
-                            </button>
-                          </Link>
-                          {/* Reject */}
-                          <Link href={`/provider/bookings?id=${b.id}&action=reject`}>
-                            <button className="inline-flex items-center gap-1.5 rounded-xl border-2 border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-2 transition-all duration-200 hover:-translate-y-0.5">
-                              <XCircle className="w-3.5 h-3.5" />
-                              Reject
-                            </button>
-                          </Link>
+                          {/* 1-Click Direct Accept & Confirm */}
+                          <button
+                            type="button"
+                            disabled={actionLoadingId === b.id}
+                            onClick={() => handleAcceptRequest(b.id)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#0a4d29] to-[#15803d] text-white text-xs font-black px-3 py-2 shadow-md shadow-green-900/20 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {actionLoadingId === b.id ? 'Confirming...' : 'Accept & Confirm'}
+                          </button>
+                          {/* Decline */}
+                          <button
+                            type="button"
+                            disabled={actionLoadingId === b.id}
+                            onClick={() => handleRejectRequest(b.id)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Decline
+                          </button>
                         </>
                       ) : (
                         <Link href={`/provider/bookings?id=${b.id}`}>

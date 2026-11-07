@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
+// High-speed short-lived in-memory cache for notifications (4s TTL)
+const notifCache = new Map<string, { data: any; ts: number }>()
+const NOTIF_CACHE_TTL = 4 * 1000
+
 // GET: Fetch real notifications for the logged-in user
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +18,11 @@ export async function GET(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const cached = notifCache.get(user.id)
+    if (cached && Date.now() - cached.ts < NOTIF_CACHE_TTL) {
+      return NextResponse.json(cached.data)
     }
 
     const { data: notifications, error } = await supabase
@@ -27,10 +38,14 @@ export async function GET(request: NextRequest) {
 
     const unreadCount = (notifications || []).filter((n: any) => !n.is_read).length
 
-    return NextResponse.json({
+    const result = {
       notifications: notifications || [],
       unreadCount,
-    })
+    }
+
+    notifCache.set(user.id, { data: result, ts: Date.now() })
+
+    return NextResponse.json(result)
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
@@ -51,6 +66,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
     const { notificationId, markAll } = body
+    notifCache.delete(user.id)
 
     if (markAll) {
       const { error } = await supabase

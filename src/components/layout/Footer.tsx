@@ -14,18 +14,26 @@ import {
   FooterContactSettings,
 } from '@/lib/footerCategoryPages'
 
+let clientCachedContacts: FooterContactSettings | null = null
+
 export function Footer() {
   const [contacts, setContacts] = useState<FooterContactSettings>(
-    DEFAULT_FOOTER_PAGES_SETTINGS.footer_contacts
+    clientCachedContacts || DEFAULT_FOOTER_PAGES_SETTINGS.footer_contacts
   )
 
   useEffect(() => {
+    if (clientCachedContacts) {
+      setContacts(clientCachedContacts)
+      return
+    }
+
     async function loadContacts() {
       try {
-        const res = await fetch(`/api/admin/footer-pages?t=${Date.now()}`)
+        const res = await fetch('/api/admin/footer-pages')
         if (res.ok) {
           const json = await res.json()
           if (json.settings?.footer_contacts) {
+            clientCachedContacts = json.settings.footer_contacts
             setContacts(json.settings.footer_contacts)
           }
         }

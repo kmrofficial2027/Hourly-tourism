@@ -3,6 +3,10 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 
 export const dynamic = 'force-dynamic'
 
+// High-speed short-lived in-memory cache for provider earnings (8s TTL)
+const earningsCache = new Map<string, { data: any; ts: number }>()
+const EARNINGS_CACHE_TTL = 8 * 1000
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -15,6 +19,12 @@ export async function GET(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const cacheKey = `${user.id}:${range}`
+    const cached = earningsCache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < EARNINGS_CACHE_TTL) {
+      return NextResponse.json(cached.data)
     }
 
     const adminSupabase = await createAdminSupabaseClient()
@@ -148,7 +158,7 @@ export async function GET(request: Request) {
 
     const completedTrips = filteredBookings.filter((b) => b.status === 'completed').length
 
-    return NextResponse.json({
+    const resultData = {
       earnings: {
         grossRevenue,
         platformCommission,
@@ -160,7 +170,10 @@ export async function GET(request: Request) {
       },
       ledger,
       payouts,
-    })
+    }
+
+    earningsCache.set(cacheKey, { data: resultData, ts: Date.now() })
+    return NextResponse.json(resultData)
   } catch (err: any) {
     console.error('Provider earnings API error:', err)
     return NextResponse.json(

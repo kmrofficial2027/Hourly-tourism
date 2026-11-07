@@ -3,6 +3,12 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { generateBookingNumber } from '@/lib/utils'
 import { DEFAULT_DESTINATIONS } from '@/lib/destinations'
 
+export const dynamic = 'force-dynamic'
+
+// High-speed short-lived in-memory cache for repeated bookings requests (4s TTL)
+const bookingsCache = new Map<string, { bookings: any[]; ts: number }>()
+const BOOKINGS_CACHE_TTL = 4000
+
 export async function POST(request: Request) {
   try {
     const supabase = await createServerSupabaseClient()
@@ -40,8 +46,10 @@ export async function POST(request: Request) {
     const endH = startH + Number(durationHours)
     const endTime = `${endH.toString().padStart(2, '0')}:${(startM || 0).toString().padStart(2, '0')}`
 
+    const adminSupabase = await createAdminSupabaseClient()
+
     // Conflict Check: Check for overlapping bookings
-    const { data: existingBookings } = await supabase
+    const { data: existingBookings } = await adminSupabase
       .from('bookings')
       .select('id, start_time, end_time, status')
       .eq('listing_id', listingId)
@@ -61,12 +69,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const adminSupabase = await createAdminSupabaseClient()
-
     // Get listing to retrieve provider_id, company_id, city, and status
     const { data: listing } = await adminSupabase
       .from('service_listings')
-      .select('provider_id, company_id, destination_city, status')
+      .select('title, provider_id, company_id, destination_city, status')
       .eq('id', listingId)
       .single()
 
@@ -101,6 +107,52 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── Resilient Provider & Company Resolution ──
+    let resolvedProviderId: string | null = listing?.provider_id || null
+    let resolvedCompanyId: string | null = listing?.company_id || null
+    let providerUserId: string | null = null
+
+    if (listing?.provider_id) {
+      // 1. Is listing.provider_id already a provider_profiles.id?
+      const { data: pRec } = await adminSupabase
+        .from('provider_profiles')
+        .select('id, user_id')
+        .eq('id', listing.provider_id)
+        .maybeSingle()
+
+      if (pRec) {
+        resolvedProviderId = pRec.id
+        providerUserId = pRec.user_id
+      } else {
+        // 2. Is listing.provider_id a user_id?
+        const { data: pUserRec } = await adminSupabase
+          .from('provider_profiles')
+          .select('id, user_id')
+          .eq('user_id', listing.provider_id)
+          .maybeSingle()
+
+        if (pUserRec) {
+          resolvedProviderId = pUserRec.id
+          providerUserId = pUserRec.user_id
+        } else {
+          providerUserId = listing.provider_id
+        }
+      }
+    }
+
+    if (!providerUserId && listing?.company_id) {
+      const { data: compRec } = await adminSupabase
+        .from('company_profiles')
+        .select('id, user_id')
+        .eq('id', listing.company_id)
+        .maybeSingle()
+
+      if (compRec) {
+        resolvedCompanyId = compRec.id
+        providerUserId = compRec.user_id
+      }
+    }
+
     const bookingNumber = generateBookingNumber()
 
     // Insert booking
@@ -108,8 +160,8 @@ export async function POST(request: Request) {
       booking_number: bookingNumber,
       customer_id: user.id,
       listing_id: listingId,
-      provider_id: listing?.provider_id || null,
-      company_id: listing?.company_id || null,
+      provider_id: resolvedProviderId,
+      company_id: resolvedCompanyId,
       package_id: packageId || null,
       booking_date: bookingDate,
       start_time: startTime,
@@ -134,7 +186,6 @@ export async function POST(request: Request) {
       .single()
 
     if (insertError) {
-      // If table doesn't exist yet or DB isn't configured, return a valid object for development
       console.warn('Booking DB insert error, using simulated booking for testing:', insertError.message)
       return NextResponse.json({
         booking: {
@@ -145,16 +196,39 @@ export async function POST(request: Request) {
       })
     }
 
-    // Insert notification for provider
-    if (listing?.provider_id) {
-      await supabase.from('notifications').insert({
-        user_id: listing.provider_id,
-        type: 'booking',
-        title: 'New Hourly Booking Request',
-        message: `You have received a new booking request for ${bookingDate} at ${startTime}.`,
-        data: { booking_id: booking.id },
-      })
+    // ── Intimation & Notification for Provider ──
+    if (providerUserId) {
+      try {
+        await adminSupabase.from('notifications').insert({
+          user_id: providerUserId,
+          type: 'booking',
+          title: '🚗 New Hourly Booking Request!',
+          message: `You have received a new booking request #${bookingNumber} for ${listing.title} on ${bookingDate} at ${startTime}.`,
+          data: {
+            booking_id: booking.id,
+            booking_number: bookingNumber,
+            listing_id: listingId,
+            customer_id: user.id,
+          },
+        })
+      } catch (notifErr) {
+        console.error('Non-fatal provider notification error:', notifErr)
+      }
     }
+
+    // Also notify the customer that their booking has been created
+    try {
+      await adminSupabase.from('notifications').insert({
+        user_id: user.id,
+        type: 'booking',
+        title: 'Booking Created Successfully 🎉',
+        message: `Your booking #${bookingNumber} for ${listing.title} on ${bookingDate} at ${startTime} is reserved. Complete payment or settle with host.`,
+        data: { booking_id: booking.id, booking_number: bookingNumber },
+      })
+    } catch {}
+
+    // Invalidate bookings cache on new booking
+    bookingsCache.clear()
 
     return NextResponse.json({ booking })
   } catch (err: any) {
@@ -175,38 +249,85 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role') || 'customer'
+    const cacheKey = `${role}:${user.id}`
+    const cached = bookingsCache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < BOOKINGS_CACHE_TTL) {
+      return NextResponse.json({ bookings: cached.bookings })
+    }
 
-    let query = supabase
-      .from('bookings')
-      .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
-      .order('created_at', { ascending: false })
+    const adminSupabase = await createAdminSupabaseClient()
 
     if (role === 'customer') {
-      query = query.eq('customer_id', user.id)
-    } else if (role === 'provider') {
-      // Find provider profile for this user
-      const { data: prov } = await supabase
-        .from('provider_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
+      const { data: bookings, error } = await adminSupabase
+        .from('bookings')
+        .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false })
 
-      if (prov) {
-        query = query.eq('provider_id', prov.id)
-      } else {
+      if (error) {
+        console.error('Customer bookings GET error:', error)
         return NextResponse.json({ bookings: [] })
       }
+
+      const result = bookings || []
+      bookingsCache.set(cacheKey, { bookings: result, ts: Date.now() })
+      return NextResponse.json({ bookings: result })
+    } else if (role === 'provider') {
+      // 1 & 2. Gather provider profile IDs and company profile IDs in parallel
+      const [provRes, compRes] = await Promise.all([
+        adminSupabase.from('provider_profiles').select('id').eq('user_id', user.id),
+        adminSupabase.from('company_profiles').select('id').eq('user_id', user.id),
+      ])
+
+      const provIds = (provRes.data || []).map((p) => p.id)
+      const compIds = (compRes.data || []).map((c) => c.id)
+
+      // 3. Gather all listings owned by this provider or user
+      const listingOrClauses: string[] = []
+      if (provIds.length > 0) listingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
+      listingOrClauses.push(`provider_id.eq.${user.id}`)
+      if (compIds.length > 0) listingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
+      listingOrClauses.push(`company_id.eq.${user.id}`)
+
+      const { data: ownedListings } = await adminSupabase
+        .from('service_listings')
+        .select('id')
+        .or(listingOrClauses.join(','))
+
+      const ownedListingIds = (ownedListings || []).map((l) => l.id)
+
+      // 4. Query bookings for this provider
+      let bQuery = adminSupabase
+        .from('bookings')
+        .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
+        .order('created_at', { ascending: false })
+
+      const bookingOrClauses: string[] = []
+      if (provIds.length > 0) bookingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
+      bookingOrClauses.push(`provider_id.eq.${user.id}`)
+      if (compIds.length > 0) bookingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
+      bookingOrClauses.push(`company_id.eq.${user.id}`)
+      if (ownedListingIds.length > 0) {
+        bookingOrClauses.push(`listing_id.in.(${ownedListingIds.join(',')})`)
+      }
+
+      bQuery = bQuery.or(bookingOrClauses.join(','))
+
+      const { data: bookings, error } = await bQuery
+
+      if (error) {
+        console.error('Provider bookings GET error:', error)
+        return NextResponse.json({ bookings: [] })
+      }
+
+      const result = bookings || []
+      bookingsCache.set(cacheKey, { bookings: result, ts: Date.now() })
+      return NextResponse.json({ bookings: result })
     }
 
-    const { data: bookings, error } = await query
-
-    if (error) {
-      return NextResponse.json({ bookings: [] })
-    }
-
-    return NextResponse.json({ bookings })
+    return NextResponse.json({ bookings: [] })
   } catch (err: any) {
+    console.error('Bookings GET route error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-

@@ -273,7 +273,6 @@ export function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={true}
                 onClick={() => setSidebarOpen(false)}
                 className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group ${
                   isActive

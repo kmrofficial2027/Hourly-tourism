@@ -53,6 +53,10 @@ export default function ProviderBookingDetailPage() {
   const [showCounterModal, setShowCounterModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showNoShowModal, setShowNoShowModal] = useState(false)
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [enteredOtp, setEnteredOtp] = useState('')
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [otpLoading, setOtpLoading] = useState(false)
 
   // Counter-offer form
   const [counterDate, setCounterDate] = useState('')
@@ -114,6 +118,35 @@ export default function ProviderBookingDetailPage() {
       showToast.error('Network error updating status.')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleVerifyOtpAndStart = async () => {
+    if (!enteredOtp || enteredOtp.trim().length !== 4) {
+      setOtpError('Please enter the full 4-digit OTP shown in the tourist app.')
+      return
+    }
+    setOtpLoading(true)
+    setOtpError(null)
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress', entered_otp: enteredOtp.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setOtpError(data.error || 'Invalid OTP. Please check the code in tourist app.')
+      } else {
+        showToast.success('Trip started! Start OTP verified successfully.')
+        setShowOtpModal(false)
+        setEnteredOtp('')
+        loadBooking()
+      }
+    } catch {
+      setOtpError('Network error verifying OTP.')
+    } finally {
+      setOtpLoading(false)
     }
   }
 
@@ -302,12 +335,16 @@ export default function ProviderBookingDetailPage() {
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => handleUpdateStatus('trip_started')}
+                  onClick={() => {
+                    setShowOtpModal(true)
+                    setEnteredOtp('')
+                    setOtpError(null)
+                  }}
                   isLoading={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-600 hover:bg-emerald-700 font-bold"
                 >
                   <Play className="w-4 h-4 mr-1.5" />
-                  Start Hourly Trip
+                  Start Hourly Trip (Verify OTP)
                 </Button>
                 <Button
                   variant="outline"
@@ -332,12 +369,16 @@ export default function ProviderBookingDetailPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => handleUpdateStatus('trip_started')}
+                onClick={() => {
+                  setShowOtpModal(true)
+                  setEnteredOtp('')
+                  setOtpError(null)
+                }}
                 isLoading={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-emerald-600 hover:bg-emerald-700 font-bold"
               >
                 <Play className="w-4 h-4 mr-1.5" />
-                Start Hourly Trip
+                Start Hourly Trip (Verify OTP)
               </Button>
             )}
 
@@ -650,6 +691,78 @@ export default function ProviderBookingDetailPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Start Trip Tourist OTP Verification Modal */}
+      {showOtpModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setShowOtpModal(false)
+            setEnteredOtp('')
+            setOtpError(null)
+          }}
+          title="Verify Tourist Start OTP"
+          size="sm"
+        >
+          <div className="space-y-4 pt-2">
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200">
+              <span className="text-xs font-bold text-amber-900 block mb-1">
+                Ride Start Verification
+              </span>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Ask the tourist to share their <strong>4-digit Start OTP</strong> from their Hourly Tourism booking screen.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                Enter 4-Digit OTP
+              </label>
+              <input
+                type="text"
+                maxLength={4}
+                value={enteredOtp}
+                onChange={(e) => {
+                  setEnteredOtp(e.target.value.replace(/\D/g, ''))
+                  setOtpError(null)
+                }}
+                placeholder="• • • •"
+                className="w-full text-center text-3xl font-mono font-black tracking-widest py-3 px-4 rounded-2xl border-2 border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-200 text-emerald-900 bg-emerald-50/30"
+                autoFocus
+              />
+              {otpError && (
+                <p className="text-xs font-semibold text-red-600 mt-2 text-center">
+                  {otpError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowOtpModal(false)
+                  setEnteredOtp('')
+                  setOtpError(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                isLoading={otpLoading}
+                onClick={handleVerifyOtpAndStart}
+                className="bg-emerald-600 hover:bg-emerald-700 font-bold"
+              >
+                <Play className="w-3.5 h-3.5 mr-1" />
+                Verify & Start Trip
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </DashboardLayout>

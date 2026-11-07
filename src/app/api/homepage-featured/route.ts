@@ -7,9 +7,21 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+let cachedFeaturedSettings: HomepageFeaturedSettings | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 60 * 1000
+
 // GET: Fetch current homepage showcase hosts and region bundle copy
 export async function GET() {
   try {
+    const now = Date.now()
+    if (cachedFeaturedSettings && now - cacheTimestamp < CACHE_TTL_MS) {
+      return NextResponse.json(
+        { success: true, settings: cachedFeaturedSettings },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+      )
+    }
+
     const adminSupabase = await createAdminSupabaseClient()
     const { data: setting } = await adminSupabase
       .from('platform_settings')
@@ -32,7 +44,13 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ success: true, settings })
+    cachedFeaturedSettings = settings
+    cacheTimestamp = now
+
+    return NextResponse.json(
+      { success: true, settings },
+      { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+    )
   } catch (err: any) {
     console.error('Homepage featured GET error:', err)
     return NextResponse.json({ success: true, settings: DEFAULT_HOMEPAGE_FEATURED_SETTINGS })
@@ -65,42 +83,58 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { settings } = body
 
-    if (!settings) {
-      return NextResponse.json({ error: 'Settings payload is required' }, { status: 400 })
+    if (!settings || typeof settings !== 'object') {
+      return NextResponse.json({ error: 'Invalid settings payload' }, { status: 400 })
     }
 
-    const updatedSettings: HomepageFeaturedSettings = {
-      section_eyebrow: settings.section_eyebrow || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.section_eyebrow,
-      section_title: settings.section_title || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.section_title,
-      all_regions_badge: settings.all_regions_badge || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.all_regions_badge,
-      all_regions_title: settings.all_regions_title || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.all_regions_title,
-      all_regions_subtitle: settings.all_regions_subtitle || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.all_regions_subtitle,
-      region_configs: settings.region_configs || DEFAULT_HOMEPAGE_FEATURED_SETTINGS.region_configs,
-      hosts: Array.isArray(settings.hosts) ? settings.hosts : DEFAULT_HOMEPAGE_FEATURED_SETTINGS.hosts,
+    // Invalidate cache
+    cachedFeaturedSettings = null
+    cacheTimestamp = 0
+
+    const { data: existing } = await adminSupabase
+      .from('platform_settings')
+      .select('id')
+      .eq('key', 'homepage_showcase_bundles')
+      .maybeSingle()
+
+    let saveErr = null
+    if (existing?.id) {
+      const { error } = await adminSupabase
+        .from('platform_settings')
+        .update({
+          value: settings,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+      saveErr = error
+    } else {
+      const { error } = await adminSupabase
+        .from('platform_settings')
+        .insert({
+          key: 'homepage_showcase_bundles',
+          value: settings,
+          category: 'homepage',
+          description: 'Homepage featured hosts and region showcase card details',
+          is_public: true,
+        })
+      saveErr = error
     }
 
-    await adminSupabase.from('platform_settings').upsert(
-      {
-        key: 'homepage_showcase_bundles',
-        value: updatedSettings,
-        description: 'Homepage Showcase Rider Hosts and Region Bundles Configuration',
-        updated_at: new Date().toISOString(),
-        updated_by: user.id,
-      },
-      { onConflict: 'key' }
-    )
+    if (saveErr) {
+      console.error('Error saving homepage showcase settings:', saveErr)
+      return NextResponse.json({ error: saveErr.message }, { status: 500 })
+    }
+
+    cachedFeaturedSettings = settings
+    cacheTimestamp = Date.now()
 
     return NextResponse.json({
       success: true,
-      settings: updatedSettings,
-      message: 'Homepage showcase and region bundle settings saved successfully!',
+      message: 'Showcase bundles updated successfully!',
+      settings,
     })
   } catch (err: any) {
     console.error('Homepage featured POST error:', err)
-    return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Failed to save settings' }, { status: 500 })
   }
-}
-
-export async function PATCH(request: Request) {
-  return POST(request)
 }

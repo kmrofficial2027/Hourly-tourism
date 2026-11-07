@@ -7,9 +7,21 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+let cachedFooterSettings: FooterPagesSettings | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 60 * 1000
+
 // GET: Fetch current footer category pages configuration
 export async function GET() {
   try {
+    const now = Date.now()
+    if (cachedFooterSettings && now - cacheTimestamp < CACHE_TTL_MS) {
+      return NextResponse.json(
+        { success: true, settings: cachedFooterSettings },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+      )
+    }
+
     const adminSupabase = await createAdminSupabaseClient()
     const { data: setting } = await adminSupabase
       .from('platform_settings')
@@ -45,7 +57,13 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ success: true, settings })
+    cachedFooterSettings = settings
+    cacheTimestamp = now
+
+    return NextResponse.json(
+      { success: true, settings },
+      { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+    )
   } catch (err: any) {
     console.error('Footer pages GET error:', err)
     return NextResponse.json({ success: true, settings: DEFAULT_FOOTER_PAGES_SETTINGS })
@@ -82,6 +100,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid settings payload' }, { status: 400 })
     }
 
+    // Invalidate cache
+    cachedFooterSettings = null
+    cacheTimestamp = 0
+
     // Check if platform_settings record exists
     const { data: existing } = await adminSupabase
       .from('platform_settings')
@@ -117,6 +139,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: saveErr.message }, { status: 500 })
     }
 
+    cachedFooterSettings = settings
+    cacheTimestamp = Date.now()
+
     return NextResponse.json({
       success: true,
       message: 'Footer category pages updated successfully!',
@@ -127,4 +152,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message || 'Failed to save settings' }, { status: 500 })
   }
 }
-
