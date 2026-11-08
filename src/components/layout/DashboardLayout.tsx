@@ -204,9 +204,10 @@ export function DashboardLayout({
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'My Account'
   const initials = displayName
-    .split(' ')
+    .trim()
+    .split(/\s+/)
     .slice(0, 2)
-    .map((w: string) => w[0])
+    .map((w: string) => w[0] || '')
     .join('')
     .toUpperCase()
 
