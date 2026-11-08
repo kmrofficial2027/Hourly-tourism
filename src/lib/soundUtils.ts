@@ -45,9 +45,10 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Plays an authentic, crisp double-tone vehicle horn / buzzer alert.
- * Tuned to mimic friendly automotive/scooter horn frequencies (587Hz D5 -> 783Hz G5),
- * ensuring providers instantly hear incoming booking alerts even when app is in the background.
+ * Plays a warm, friendly, melodic notification chime.
+ * Tuned to an elegant E-Major acoustic chime arpeggio (E5 -> G#5 -> B5),
+ * ensuring providers receive a clear, welcoming, pleasant notification
+ * that is comfortable to the ears and non-alarming.
  */
 export function playMildHornBuzzer() {
   if (typeof window === 'undefined') return
@@ -67,58 +68,56 @@ export function playMildHornBuzzer() {
 
     const startTime = ctx.currentTime
 
-    // Helper: Play a single crisp vehicle horn blast
-    const playHornPulse = (pulseStart: number, duration: number) => {
-      // Primary Oscillator (Triangle wave for warm acoustic vehicle horn body)
+    // Friendly 3-note harmonic chime sequence (E5 -> G#5 -> B5)
+    const chimeNotes = [
+      { freq: 659.25, time: startTime, dur: 0.22, vol: 0.22 },        // E5
+      { freq: 830.61, time: startTime + 0.12, dur: 0.24, vol: 0.25 }, // G#5
+      { freq: 987.77, time: startTime + 0.26, dur: 0.55, vol: 0.28 }, // B5
+    ]
+
+    chimeNotes.forEach(({ freq, time, dur, vol }) => {
+      // Primary Oscillator (Pure warm sine wave)
       const osc1 = ctx.createOscillator()
       const gain1 = ctx.createGain()
 
-      osc1.type = 'triangle'
-      osc1.frequency.setValueAtTime(587.33, pulseStart) // D5
-      osc1.frequency.exponentialRampToValueAtTime(783.99, pulseStart + 0.08) // G5
+      osc1.type = 'sine'
+      osc1.frequency.setValueAtTime(freq, time)
 
-      gain1.gain.setValueAtTime(0, pulseStart)
-      gain1.gain.linearRampToValueAtTime(0.55, pulseStart + 0.02)
-      gain1.gain.exponentialRampToValueAtTime(0.001, pulseStart + duration)
+      gain1.gain.setValueAtTime(0, time)
+      gain1.gain.linearRampToValueAtTime(vol, time + 0.02)
+      gain1.gain.exponentialRampToValueAtTime(0.001, time + dur)
 
       osc1.connect(gain1)
       gain1.connect(ctx.destination)
 
-      osc1.start(pulseStart)
-      osc1.stop(pulseStart + duration)
+      osc1.start(time)
+      osc1.stop(time + dur)
 
-      // Secondary Oscillator (Sine wave for bright upper harmonic resonance)
+      // Secondary Oscillator (Soft overtone for rich chime body)
       const osc2 = ctx.createOscillator()
       const gain2 = ctx.createGain()
 
-      osc2.type = 'sine'
-      osc2.frequency.setValueAtTime(740, pulseStart)
-      osc2.frequency.exponentialRampToValueAtTime(880, pulseStart + 0.08) // A5
+      osc2.type = 'triangle'
+      osc2.frequency.setValueAtTime(freq * 1.5, time)
 
-      gain2.gain.setValueAtTime(0, pulseStart)
-      gain2.gain.linearRampToValueAtTime(0.4, pulseStart + 0.02)
-      gain2.gain.exponentialRampToValueAtTime(0.001, pulseStart + duration)
+      gain2.gain.setValueAtTime(0, time)
+      gain2.gain.linearRampToValueAtTime(vol * 0.25, time + 0.02)
+      gain2.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.7)
 
       osc2.connect(gain2)
       gain2.connect(ctx.destination)
 
-      osc2.start(pulseStart)
-      osc2.stop(pulseStart + duration)
-    }
-
-    // Pulse 1: First honk (0.16s)
-    playHornPulse(startTime, 0.16)
-
-    // Pulse 2: Second honk after 0.1s pause (0.22s) -> Authentic Indian double-honk "Beep-Beep!"
-    playHornPulse(startTime + 0.22, 0.22)
+      osc2.start(time)
+      osc2.stop(time + dur * 0.7)
+    })
   } catch (err) {
-    console.debug('Mild horn audio notification skipped:', err)
+    console.debug('Friendly audio notification skipped:', err)
   }
 }
 
 /**
- * Starts continuous looping buzzer for the provider when a new booking arrives.
- * Rings every 1.8 seconds. Provider can stop it ONLY by accepting or declining the trip.
+ * Starts continuous looping notification for the provider when a new booking arrives.
+ * Plays a friendly melodic chime every 3.8 seconds until provider accepts or declines.
  */
 export function startContinuousProviderBuzzer() {
   if (typeof window === 'undefined') return
@@ -128,10 +127,10 @@ export function startContinuousProviderBuzzer() {
   // Play immediately
   playMildHornBuzzer()
 
-  // Repeat every 1.8 seconds until stopped by provider accepting or declining
+  // Repeat every 3.8 seconds in a calm, friendly rhythm
   continuousBuzzerInterval = setInterval(() => {
     playMildHornBuzzer()
-  }, 1800)
+  }, 3800)
 
   // Broadcast event so UI can display ringing status
   window.dispatchEvent(new CustomEvent('hourly-provider-buzzer-change', { detail: { active: true } }))

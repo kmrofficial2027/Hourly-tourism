@@ -52,8 +52,8 @@ export function triggerProviderBookingPushNotification(booking: any) {
   const amount = booking.total_amount ? `₹${booking.total_amount}` : ''
   const pickup = booking.pickup_location || 'Customer location'
 
-  const title = `🚨 New Hourly Booking Request #${bookingNum}!`
-  const body = `Customer requested ${hours} hr(s) on ${date} (${amount}). Pickup: ${pickup}. Tap to Accept or Decline immediately!`
+  const title = `✨ New Hourly Booking Request #${bookingNum}`
+  const body = `Customer requested ${hours} hr(s) on ${date} (${amount}). Pickup: ${pickup}. Tap to review and confirm.`
 
   try {
     // 1. Android Chrome requires ServiceWorkerRegistration.showNotification()

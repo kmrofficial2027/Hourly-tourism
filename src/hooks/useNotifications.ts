@@ -151,39 +151,46 @@ export function useNotifications(
   useEffect(() => {
     if (!userId || !realtime) return
 
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as Notification
-          setNotifications((prev) => [newNotification, ...prev])
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const updated = payload.new as Notification
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === updated.id ? updated : n))
-          )
-        }
-      )
-      .subscribe()
+    const uniqueChannelName = `notifications-${userId}-${Math.random().toString(36).substring(2, 9)}`
+    let channel: RealtimeChannel | null = null
 
-    channelRef.current = channel
+    try {
+      channel = supabase
+        .channel(uniqueChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const newNotification = payload.new as Notification
+            setNotifications((prev) => [newNotification, ...prev])
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const updated = payload.new as Notification
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === updated.id ? updated : n))
+            )
+          }
+        )
+        .subscribe()
+
+      channelRef.current = channel
+    } catch (err) {
+      console.debug('Notifications realtime subscription skipped:', err)
+    }
 
     return () => {
       if (channelRef.current) {

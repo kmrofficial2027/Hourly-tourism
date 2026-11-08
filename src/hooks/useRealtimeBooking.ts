@@ -24,50 +24,56 @@ export function useRealtimeBooking(bookingId: string | null | undefined, onStatu
     if (!bookingId) return
 
     const supabase = createClient()
+    const uniqueChannelName = `booking-live-${bookingId}-${Math.random().toString(36).substring(2, 9)}`
+    let channel: any = null
 
-    const channel = supabase
-      .channel(`booking-live-${bookingId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'bookings',
-          filter: `id=eq.${bookingId}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as any)?.status
-          const updated = payload.new
-          if (newStatus) {
-            setRealtimeState({
-              status: newStatus,
-              updatedPayload: updated,
-              lastUpdated: new Date(),
-              isConnected: true,
-            })
+    try {
+      channel = supabase
+        .channel(uniqueChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'bookings',
+            filter: `id=eq.${bookingId}`,
+          },
+          (payload) => {
+            const newStatus = (payload.new as any)?.status
+            const updated = payload.new
+            if (newStatus) {
+              setRealtimeState({
+                status: newStatus,
+                updatedPayload: updated,
+                lastUpdated: new Date(),
+                isConnected: true,
+              })
 
-            // Audio Intimation for Customer: Two Distinct Sounds
-            if (newStatus === 'confirmed') {
-              playBookingAcceptedSound()
-            } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
-              playBookingRejectedSound()
-            }
+              // Audio Intimation for Customer: Two Distinct Sounds
+              if (newStatus === 'confirmed') {
+                playBookingAcceptedSound()
+              } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
+                playBookingRejectedSound()
+              }
 
-            const formatted = newStatus.replace(/_/g, ' ')
-            showToast.success(`Live Update: Booking status is now "${formatted}"`)
-            if (onStatusChange) {
-              onStatusChange(newStatus, updated)
+              const formatted = newStatus.replace(/_/g, ' ')
+              showToast.success(`Live Update: Booking status is now "${formatted}"`)
+              if (onStatusChange) {
+                onStatusChange(newStatus, updated)
+              }
             }
           }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setRealtimeState((prev) => ({ ...prev, isConnected: true }))
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setRealtimeState((prev) => ({ ...prev, isConnected: false }))
-        }
-      })
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setRealtimeState((prev) => ({ ...prev, isConnected: true }))
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setRealtimeState((prev) => ({ ...prev, isConnected: false }))
+          }
+        })
+    } catch (err) {
+      console.debug('Realtime booking subscription skipped:', err)
+    }
 
     // Rapid 5-second polling check guaranteeing immediate status sync between tourist and host
     const pollInterval = setInterval(async () => {
@@ -98,7 +104,9 @@ export function useRealtimeBooking(bookingId: string | null | undefined, onStatu
     }, 5000)
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
       clearInterval(pollInterval)
     }
   }, [bookingId, onStatusChange])

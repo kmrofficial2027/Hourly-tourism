@@ -141,21 +141,28 @@ export default function ProviderBookingsPage() {
 
     // Realtime listener for incoming booking requests
     const supabase = createClient()
-    const channel = supabase
-      .channel('provider-bookings-live-alerts')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'bookings' },
-        (payload) => {
-          const b = payload.new as any
-          if (['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(b?.status)) {
-            startContinuousProviderBuzzer()
-            showToast.success('🚗 New Booking Request! Accept or Decline to stop buzzer alert.')
+    const uniqueChannelName = `provider-bookings-alerts-${Math.random().toString(36).substring(2, 9)}`
+    let channel: any = null
+
+    try {
+      channel = supabase
+        .channel(uniqueChannelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          (payload) => {
+            const b = payload.new as any
+            if (['pending', 'pending_provider_approval', 'awaiting_confirmation'].includes(b?.status)) {
+              startContinuousProviderBuzzer()
+              showToast.success('✨ New Booking Request Received!')
+            }
+            loadBookings(true)
           }
-          loadBookings(true)
-        }
-      )
-      .subscribe()
+        )
+        .subscribe()
+    } catch (err) {
+      console.debug('Provider bookings realtime subscription skipped:', err)
+    }
 
     // Battery-efficient 8-second polling interval delivering new incoming booking requests without manual reload
     const pollInterval = setInterval(() => {
@@ -167,7 +174,9 @@ export default function ProviderBookingsPage() {
 
     return () => {
       window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
-      supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
       clearInterval(pollInterval)
       stopContinuousProviderBuzzer()
     }
@@ -349,26 +358,26 @@ export default function ProviderBookingsPage() {
           </button>
         </div>
 
-        {/* Continuous Looping Buzzer Alert Banner for Provider */}
+        {/* Friendly Notification Chime Alert Banner for Provider */}
         {buzzerRinging && (
-          <div className="p-4 rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white shadow-xl shadow-red-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse border-2 border-yellow-300">
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-[#0a4d29] via-emerald-700 to-teal-800 text-white shadow-xl shadow-emerald-900/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-emerald-500/30">
             <div className="flex items-center space-x-3">
-              <span className="w-10 h-10 rounded-2xl bg-white text-red-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
-                🚨
+              <span className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
+                🔔
               </span>
               <div>
-                <p className="font-black text-sm">New Booking Request Arrived — Buzzer Ringing!</p>
+                <p className="font-black text-sm">New Booking Request Arrived — Notification Active!</p>
                 <p className="text-xs text-white/95">
-                  Accept & Confirm or Decline the pending request below to stop the alert buzzer.
+                  Accept & Confirm or Decline the pending request below to confirm the ride.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => stopContinuousProviderBuzzer()}
-              className="px-4 py-2 rounded-xl bg-black/40 hover:bg-black/60 text-white text-xs font-bold transition-colors shrink-0"
+              className="px-4 py-2 rounded-xl bg-black/20 hover:bg-black/40 text-white text-xs font-bold transition-colors shrink-0"
             >
-              Mute Buzzer
+              Mute Alert
             </button>
           </div>
         )}

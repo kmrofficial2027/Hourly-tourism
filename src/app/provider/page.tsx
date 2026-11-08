@@ -394,17 +394,17 @@ export default function ProviderOverviewPage() {
           </div>
         </div>
 
-        {/* Continuous Looping Buzzer Alert Banner for Provider */}
+        {/* Friendly Notification Chime Alert Banner for Provider */}
         {buzzerRinging && (
-          <div className="p-4 rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white shadow-xl shadow-red-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse border-2 border-yellow-300">
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-[#0a4d29] via-emerald-700 to-teal-800 text-white shadow-xl shadow-emerald-900/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-emerald-500/30">
             <div className="flex items-center space-x-3">
-              <span className="w-10 h-10 rounded-2xl bg-white text-red-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
-                🚨
+              <span className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
+                🔔
               </span>
               <div>
-                <p className="font-black text-sm">New Booking Arrived — Audio Buzzer Ringing!</p>
+                <p className="font-black text-sm">New Booking Request Arrived — Notification Active!</p>
                 <p className="text-xs text-white/95">
-                  Accept or Decline the request below to confirm the ride and silence the buzzer.
+                  Accept or Decline the request below to confirm the ride and finish scheduling.
                 </p>
               </div>
             </div>
@@ -412,13 +412,13 @@ export default function ProviderOverviewPage() {
               <button
                 type="button"
                 onClick={() => stopContinuousProviderBuzzer()}
-                className="px-3.5 py-2 rounded-xl bg-black/40 hover:bg-black/60 text-white text-xs font-bold transition-colors"
+                className="px-3.5 py-2 rounded-xl bg-black/20 hover:bg-black/40 text-white text-xs font-bold transition-colors"
               >
-                Mute Buzzer
+                Mute Alert
               </button>
               <Link
                 href="/provider/bookings"
-                className="px-4 py-2 rounded-xl bg-white text-red-700 text-xs font-black hover:bg-red-50 transition-colors text-center shrink-0 shadow-sm"
+                className="px-4 py-2 rounded-xl bg-white text-[#0a4d29] text-xs font-black hover:bg-emerald-50 transition-colors text-center shrink-0 shadow-sm"
               >
                 Open Bookings Queue →
               </Link>

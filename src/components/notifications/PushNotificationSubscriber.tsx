@@ -43,54 +43,61 @@ export function PushNotificationSubscriber() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const supabase = createClient()
+    let channel: any = null
 
-    const channel = supabase
-      .channel('hourly-push-broadcasts')
-      .on('broadcast', { event: 'push_notification' }, (payload: any) => {
-        const data = payload?.payload
-        if (!data) return
+    try {
+      channel = supabase
+        .channel('hourly-push-broadcasts')
+        .on('broadcast', { event: 'push_notification' }, (payload: any) => {
+          const data = payload?.payload
+          if (!data) return
 
-        // Target audience check
-        const targetAudience = data.audience || 'all'
-        const userRole = profile?.role || 'customer'
+          // Target audience check
+          const targetAudience = data.audience || 'all'
+          const userRole = profile?.role || 'customer'
 
-        const isMatch =
-          targetAudience === 'all' ||
-          (targetAudience === 'tourist' && userRole === 'customer') ||
-          (targetAudience === 'provider' && userRole === 'provider') ||
-          (data.targetUserId && data.targetUserId === user?.id)
+          const isMatch =
+            targetAudience === 'all' ||
+            (targetAudience === 'tourist' && userRole === 'customer') ||
+            (targetAudience === 'provider' && userRole === 'provider') ||
+            (data.targetUserId && data.targetUserId === user?.id)
 
-        if (!isMatch) return
+          if (!isMatch) return
 
-        // Trigger native notification if permission granted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'SHOW_NOTIFICATION',
-              title: data.title,
-              message: data.message,
-              actionUrl: data.actionUrl,
-            })
-          } else {
-            try {
-              new Notification(data.title, {
-                body: data.message,
-                icon: '/icon-192.png',
-                badge: '/favicon.png',
+          // Trigger native notification if permission granted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SHOW_NOTIFICATION',
+                title: data.title,
+                message: data.message,
+                actionUrl: data.actionUrl,
               })
-            } catch (e) {
-              // fallback
+            } else {
+              try {
+                new Notification(data.title, {
+                  body: data.message,
+                  icon: '/icon-192.png',
+                  badge: '/favicon.png',
+                })
+              } catch (e) {
+                // fallback
+              }
             }
           }
-        }
 
-        // Also trigger in-app visual toast
-        showToast.success(`📢 ${data.title}: ${data.message}`)
-      })
-      .subscribe()
+          // Also trigger in-app visual toast
+          showToast.success(`📢 ${data.title}: ${data.message}`)
+        })
+        .subscribe()
+    } catch (err) {
+      console.debug('Push broadcast subscriber skipped:', err)
+    }
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
     }
   }, [user, profile])
 

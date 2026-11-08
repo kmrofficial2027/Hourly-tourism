@@ -31,29 +31,38 @@ export function useRealtimeNotifications(userId: string | undefined) {
 
     fetchInitialCount()
 
-    const channel = supabase
-      .channel(`user-notifications-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          setUnreadCount((prev) => prev + 1)
-          setHasNewAlert(true)
-          const title = (payload.new as any)?.title || 'New Notification'
-          const message = (payload.new as any)?.message || ''
-          showToast.success(`🔔 ${title}: ${message}`)
-          setTimeout(() => setHasNewAlert(false), 5000)
-        }
-      )
-      .subscribe()
+    const uniqueChannelName = `user-notifications-${userId}-${Math.random().toString(36).substring(2, 9)}`
+    let channel: any = null
+
+    try {
+      channel = supabase
+        .channel(uniqueChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            setUnreadCount((prev) => prev + 1)
+            setHasNewAlert(true)
+            const title = (payload.new as any)?.title || 'New Notification'
+            const message = (payload.new as any)?.message || ''
+            showToast.success(`🔔 ${title}: ${message}`)
+            setTimeout(() => setHasNewAlert(false), 5000)
+          }
+        )
+        .subscribe()
+    } catch (err) {
+      console.debug('Realtime notifications subscription skipped:', err)
+    }
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
     }
   }, [userId])
 
