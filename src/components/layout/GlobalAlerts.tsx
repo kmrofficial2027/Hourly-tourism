@@ -190,10 +190,13 @@ export function CustomerGlobalAlerts() {
 
   const previousStatusMapRef = React.useRef<Map<string, string>>(new Map())
   const hasLoadedInitialRef = React.useRef(false)
+  const isFetchingRef = React.useRef(false)
 
-  // Rapid 5-second polling check for customer booking status transitions
+  // Resilient status polling with in-flight guard
   const checkCustomerStatusUpdates = React.useCallback(async () => {
-    if (!user) return
+    if (!user || isFetchingRef.current) return
+    isFetchingRef.current = true
+
     try {
       const res = await fetch('/api/bookings?role=customer')
       if (res.ok) {
@@ -234,17 +237,19 @@ export function CustomerGlobalAlerts() {
       }
     } catch {
       // Non-fatal
+    } finally {
+      isFetchingRef.current = false
     }
-  }, [user])
+  }, [user?.id])
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     checkCustomerStatusUpdates()
 
     const supabase = createClient()
     const channel = supabase
-      .channel('customer-global-status-alerts')
+      .channel(`customer-global-status-alerts-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -286,16 +291,19 @@ export function CustomerGlobalAlerts() {
       )
       .subscribe()
 
-    // Rapid 5-second polling interval delivering updates without requiring manual refresh
+    // Battery-efficient background polling (every 8 seconds when active, paused when minimized)
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
       checkCustomerStatusUpdates()
-    }, 5000)
+    }, 8000)
 
     return () => {
       supabase.removeChannel(channel)
       clearInterval(interval)
     }
-  }, [user, checkCustomerStatusUpdates])
+  }, [user?.id, checkCustomerStatusUpdates])
 
   if (!activeAlert) return null
 

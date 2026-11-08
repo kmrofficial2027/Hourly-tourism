@@ -103,10 +103,13 @@ export function useProviderQueue(providerId?: string) {
       )
       .subscribe()
 
-    // Rapid 5-second background polling ensuring instant alert delivery
+    // Battery-efficient 8-second background polling ensuring instant alert delivery (skips when tab minimized)
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
       fetchPending()
-    }, 5000)
+    }, 8000)
 
     return () => {
       supabase.removeChannel(channel)

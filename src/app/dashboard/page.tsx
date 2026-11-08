@@ -120,9 +120,16 @@ export default function CustomerDashboardPage() {
     }
   }, [profile, authLoading])
 
+  const isFetchingRef = React.useRef(false)
+
   useEffect(() => {
-    async function loadBookings() {
-      setLoading(true)
+    async function loadBookings(isBackground = false) {
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
+      if (!isBackground) {
+        setLoading(true)
+      }
       try {
         const res = await fetch('/api/bookings?role=customer')
         if (res.ok) {
@@ -132,16 +139,22 @@ export default function CustomerDashboardPage() {
       } catch (err) {
         console.error('Error fetching bookings:', err)
       } finally {
-        setLoading(false)
+        if (!isBackground) {
+          setLoading(false)
+        }
+        isFetchingRef.current = false
       }
     }
 
-    loadBookings()
+    loadBookings(false)
 
-    // 5-second auto-refresh for customer overview trips and active bookings
+    // Gentle 10-second background auto-refresh for overview stats and trips
     const interval = setInterval(() => {
-      loadBookings()
-    }, 5000)
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      loadBookings(true)
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [])

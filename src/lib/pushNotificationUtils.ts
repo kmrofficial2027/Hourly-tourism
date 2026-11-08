@@ -13,7 +13,22 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
   try {
     if (Notification.permission === 'default') {
-      const permission = await Notification.requestPermission()
+      let permission: NotificationPermission = 'default'
+      if (typeof Notification.requestPermission === 'function') {
+        const result = Notification.requestPermission()
+        if (result && typeof result.then === 'function') {
+          permission = await result
+        } else {
+          // Legacy callback style support
+          permission = await new Promise<NotificationPermission>((resolve) => {
+            try {
+              Notification.requestPermission((p) => resolve(p as NotificationPermission))
+            } catch {
+              resolve('denied')
+            }
+          })
+        }
+      }
       return permission
     }
     return Notification.permission
@@ -25,7 +40,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
 /**
  * Sends a native system push notification when a new booking request is received.
- * Works even when the browser tab is in the background or minimized.
+ * Works seamlessly across mobile (Android Chrome ServiceWorker) and desktop browsers.
  */
 export function triggerProviderBookingPushNotification(booking: any) {
   if (typeof window === 'undefined' || !('Notification' in window)) return
@@ -41,15 +56,45 @@ export function triggerProviderBookingPushNotification(booking: any) {
   const body = `Customer requested ${hours} hr(s) on ${date} (${amount}). Pickup: ${pickup}. Tap to Accept or Decline immediately!`
 
   try {
+    // 1. Android Chrome requires ServiceWorkerRegistration.showNotification()
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          reg.showNotification(title, {
+            body,
+            icon: '/icon-192.png',
+            badge: '/favicon.png',
+            tag: `booking-alert-${booking.id}`,
+            data: { url: `/provider/bookings?id=${booking.id}` },
+            vibrate: [250, 100, 250],
+          } as any)
+        })
+        .catch(() => {
+          // 2. Desktop browser fallback
+          try {
+            const notif = new Notification(title, {
+              body,
+              icon: '/icon-192.png',
+              badge: '/favicon.png',
+              tag: `booking-alert-${booking.id}`,
+            })
+            notif.onclick = () => {
+              window.focus()
+              window.location.href = `/provider/bookings?id=${booking.id}`
+              notif.close()
+            }
+          } catch {}
+        })
+      return
+    }
+
+    // 3. Direct constructor for non-service worker contexts
     const notif = new Notification(title, {
       body,
-      icon: '/images/logo.png',
-      badge: '/images/logo.png',
+      icon: '/icon-192.png',
+      badge: '/favicon.png',
       tag: `booking-alert-${booking.id}`,
-      requireInteraction: true, // Notification stays on screen until provider acts
-      silent: false,
     })
-
     notif.onclick = () => {
       window.focus()
       window.location.href = `/provider/bookings?id=${booking.id}`
@@ -59,4 +104,3 @@ export function triggerProviderBookingPushNotification(booking: any) {
     console.debug('Push notification display skipped:', err)
   }
 }
-

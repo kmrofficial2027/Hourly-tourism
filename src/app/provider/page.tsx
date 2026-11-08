@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Compass,
@@ -60,10 +60,16 @@ export default function ProviderOverviewPage() {
 
   // Real-time Provider queue listener
   const { hasNewPing, latestPendingBooking } = useProviderQueue()
+  const isFetchingRef = useRef(false)
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
+    async function loadData(isBackground = false) {
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
+      if (!isBackground) {
+        setLoading(true)
+      }
       try {
         const [bookingsRes, servicesRes, verifRes, profileRes] = await Promise.all([
           fetch('/api/bookings?role=provider'),
@@ -120,16 +126,22 @@ export default function ProviderOverviewPage() {
       } catch (err) {
         console.error(err)
       } finally {
-        setLoading(false)
+        if (!isBackground) {
+          setLoading(false)
+        }
+        isFetchingRef.current = false
       }
     }
 
-    loadData()
+    loadData(false)
 
-    // 5-second background auto-refresh for provider overview stats and incoming bookings
+    // Battery-friendly 12-second background refresh for provider stats (skips when tab minimized)
     const interval = setInterval(() => {
-      loadData()
-    }, 5000)
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      loadData(true)
+    }, 12000)
 
     return () => clearInterval(interval)
   }, [])

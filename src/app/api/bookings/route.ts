@@ -5,9 +5,39 @@ import { DEFAULT_DESTINATIONS } from '@/lib/destinations'
 
 export const dynamic = 'force-dynamic'
 
-// High-speed short-lived in-memory cache for repeated bookings requests (4s TTL)
+// High-speed short-lived in-memory cache for repeated bookings requests (5s TTL)
 const bookingsCache = new Map<string, { bookings: any[]; ts: number }>()
-const BOOKINGS_CACHE_TTL = 4000
+const BOOKINGS_CACHE_TTL = 5000
+
+// In-memory cache for user auth tokens to avoid hammering Supabase Auth (8s TTL)
+const authUserCache = new Map<string, { user: any; ts: number }>()
+const AUTH_CACHE_TTL = 8000
+
+// In-flight query deduplication map to prevent multiple identical queries running concurrently
+const inFlightQueries = new Map<string, Promise<any[]>>()
+
+async function getCachedAuthUser(request: Request) {
+  const authHeader = request.headers.get('authorization')
+  const cookieHeader = request.headers.get('cookie') || ''
+  const tokenKey = authHeader || cookieHeader.slice(0, 160)
+
+  if (tokenKey) {
+    const cached = authUserCache.get(tokenKey)
+    if (cached && Date.now() - cached.ts < AUTH_CACHE_TTL) {
+      return cached.user
+    }
+  }
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user && tokenKey) {
+    authUserCache.set(tokenKey, { user, ts: Date.now() })
+  }
+  return user
+}
 
 export async function POST(request: Request) {
   try {
@@ -238,10 +268,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getCachedAuthUser(request)
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -250,82 +277,97 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role') || 'customer'
     const cacheKey = `${role}:${user.id}`
+
+    // 1. In-memory cache hit (< 5000ms old) -> respond instantly in 0ms
     const cached = bookingsCache.get(cacheKey)
     if (cached && Date.now() - cached.ts < BOOKINGS_CACHE_TTL) {
       return NextResponse.json({ bookings: cached.bookings })
     }
 
-    const adminSupabase = await createAdminSupabaseClient()
-
-    if (role === 'customer') {
-      const { data: bookings, error } = await adminSupabase
-        .from('bookings')
-        .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
-        .eq('customer_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Customer bookings GET error:', error)
-        return NextResponse.json({ bookings: [] })
-      }
-
-      const result = bookings || []
-      bookingsCache.set(cacheKey, { bookings: result, ts: Date.now() })
-      return NextResponse.json({ bookings: result })
-    } else if (role === 'provider') {
-      // 1 & 2. Gather provider profile IDs and company profile IDs in parallel
-      const [provRes, compRes] = await Promise.all([
-        adminSupabase.from('provider_profiles').select('id').eq('user_id', user.id),
-        adminSupabase.from('company_profiles').select('id').eq('user_id', user.id),
-      ])
-
-      const provIds = (provRes.data || []).map((p) => p.id)
-      const compIds = (compRes.data || []).map((c) => c.id)
-
-      // 3. Gather all listings owned by this provider or user
-      const listingOrClauses: string[] = []
-      if (provIds.length > 0) listingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
-      listingOrClauses.push(`provider_id.eq.${user.id}`)
-      if (compIds.length > 0) listingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
-      listingOrClauses.push(`company_id.eq.${user.id}`)
-
-      const { data: ownedListings } = await adminSupabase
-        .from('service_listings')
-        .select('id')
-        .or(listingOrClauses.join(','))
-
-      const ownedListingIds = (ownedListings || []).map((l) => l.id)
-
-      // 4. Query bookings for this provider
-      let bQuery = adminSupabase
-        .from('bookings')
-        .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
-        .order('created_at', { ascending: false })
-
-      const bookingOrClauses: string[] = []
-      if (provIds.length > 0) bookingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
-      bookingOrClauses.push(`provider_id.eq.${user.id}`)
-      if (compIds.length > 0) bookingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
-      bookingOrClauses.push(`company_id.eq.${user.id}`)
-      if (ownedListingIds.length > 0) {
-        bookingOrClauses.push(`listing_id.in.(${ownedListingIds.join(',')})`)
-      }
-
-      bQuery = bQuery.or(bookingOrClauses.join(','))
-
-      const { data: bookings, error } = await bQuery
-
-      if (error) {
-        console.error('Provider bookings GET error:', error)
-        return NextResponse.json({ bookings: [] })
-      }
-
-      const result = bookings || []
-      bookingsCache.set(cacheKey, { bookings: result, ts: Date.now() })
-      return NextResponse.json({ bookings: result })
+    // 2. In-flight request deduplication -> share the same query execution promise
+    if (inFlightQueries.has(cacheKey)) {
+      const existing = await inFlightQueries.get(cacheKey)
+      return NextResponse.json({ bookings: existing || [] })
     }
 
-    return NextResponse.json({ bookings: [] })
+    const queryPromise = (async () => {
+      const adminSupabase = await createAdminSupabaseClient()
+
+      if (role === 'customer') {
+        const { data: bookings, error } = await adminSupabase
+          .from('bookings')
+          .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
+          .eq('customer_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Customer bookings GET error:', error)
+          return []
+        }
+
+        return bookings || []
+      } else if (role === 'provider') {
+        // 1 & 2. Gather provider profile IDs and company profile IDs in parallel
+        const [provRes, compRes] = await Promise.all([
+          adminSupabase.from('provider_profiles').select('id').eq('user_id', user.id),
+          adminSupabase.from('company_profiles').select('id').eq('user_id', user.id),
+        ])
+
+        const provIds = (provRes.data || []).map((p) => p.id)
+        const compIds = (compRes.data || []).map((c) => c.id)
+
+        // 3. Gather all listings owned by this provider or user
+        const listingOrClauses: string[] = []
+        if (provIds.length > 0) listingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
+        listingOrClauses.push(`provider_id.eq.${user.id}`)
+        if (compIds.length > 0) listingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
+        listingOrClauses.push(`company_id.eq.${user.id}`)
+
+        const { data: ownedListings } = await adminSupabase
+          .from('service_listings')
+          .select('id')
+          .or(listingOrClauses.join(','))
+
+        const ownedListingIds = (ownedListings || []).map((l) => l.id)
+
+        // 4. Query bookings for this provider
+        let bQuery = adminSupabase
+          .from('bookings')
+          .select('*, service_listings(title, category, destination_city, images), profiles:customer_id(full_name, phone, email)')
+          .order('created_at', { ascending: false })
+
+        const bookingOrClauses: string[] = []
+        if (provIds.length > 0) bookingOrClauses.push(`provider_id.in.(${provIds.join(',')})`)
+        bookingOrClauses.push(`provider_id.eq.${user.id}`)
+        if (compIds.length > 0) bookingOrClauses.push(`company_id.in.(${compIds.join(',')})`)
+        bookingOrClauses.push(`company_id.eq.${user.id}`)
+        if (ownedListingIds.length > 0) {
+          bookingOrClauses.push(`listing_id.in.(${ownedListingIds.join(',')})`)
+        }
+
+        bQuery = bQuery.or(bookingOrClauses.join(','))
+
+        const { data: bookings, error } = await bQuery
+
+        if (error) {
+          console.error('Provider bookings GET error:', error)
+          return []
+        }
+
+        return bookings || []
+      }
+
+      return []
+    })()
+
+    inFlightQueries.set(cacheKey, queryPromise)
+    try {
+      const result = await queryPromise
+      bookingsCache.set(cacheKey, { bookings: result, ts: Date.now() })
+      return NextResponse.json({ bookings: result })
+    } finally {
+      inFlightQueries.delete(cacheKey)
+    }
   } catch (err: any) {
     console.error('Bookings GET route error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })

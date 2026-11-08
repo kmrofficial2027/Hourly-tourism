@@ -63,6 +63,29 @@ const iconColors = [
   'text-cyan-400',
 ]
 
+class SafeAlertBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: any) {
+    console.debug('SafeAlertBoundary caught non-fatal audio alert error:', error)
+  }
+
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
+
 export function DashboardLayout({
   children,
   role = 'customer',
@@ -324,8 +347,10 @@ export function DashboardLayout({
       {/* ── MAIN CONTENT AREA ──────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Global Realtime Audio & Buzzer Alert Bars (Provider & Customer) ── */}
-        {role === 'provider' && <ProviderGlobalAlerts />}
-        {role === 'customer' && <CustomerGlobalAlerts />}
+        <SafeAlertBoundary>
+          {role === 'provider' && <ProviderGlobalAlerts />}
+          {role === 'customer' && <CustomerGlobalAlerts />}
+        </SafeAlertBoundary>
 
         {/* ── Top Header Bar (Taller, prominent & mobile-centered logo) ── */}
         <header className="sticky top-0 z-30 h-20 sm:h-22 bg-white/95 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm">

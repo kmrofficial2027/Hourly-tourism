@@ -75,8 +75,15 @@ export default function ProviderBookingsPage() {
     'Other reason',
   ]
 
-  const loadBookings = async () => {
-    setLoading(true)
+  const isFetchingRef = useRef(false)
+
+  const loadBookings = async (isBackground = false) => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+
+    if (!isBackground) {
+      setLoading(true)
+    }
     try {
       const res = await fetch('/api/bookings?role=provider')
       if (res.ok) {
@@ -117,12 +124,15 @@ export default function ProviderBookingsPage() {
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!isBackground) {
+        setLoading(false)
+      }
+      isFetchingRef.current = false
     }
   }
 
   useEffect(() => {
-    loadBookings()
+    loadBookings(false)
 
     const handleBuzzerChange = (e: any) => {
       setBuzzerRinging(Boolean(e.detail?.active))
@@ -142,15 +152,18 @@ export default function ProviderBookingsPage() {
             startContinuousProviderBuzzer()
             showToast.success('🚗 New Booking Request! Accept or Decline to stop buzzer alert.')
           }
-          loadBookings()
+          loadBookings(true)
         }
       )
       .subscribe()
 
-    // Rapid 5-second polling interval delivering new incoming booking requests without manual reload
+    // Battery-efficient 8-second polling interval delivering new incoming booking requests without manual reload
     const pollInterval = setInterval(() => {
-      loadBookings()
-    }, 5000)
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      loadBookings(true)
+    }, 8000)
 
     return () => {
       window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)

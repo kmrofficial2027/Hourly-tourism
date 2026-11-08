@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Notification } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -32,40 +32,52 @@ export function useNotifications(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const isFetchingRef = useRef<boolean>(false)
 
   // ---- Fetch notifications ----
-  const fetchNotifications = useCallback(async () => {
-    if (!userId) {
-      setNotifications([])
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { data, error: fetchError } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-
-      if (fetchError) {
-        setError(fetchError.message)
+  const fetchNotifications = useCallback(
+    async (isBackground = false) => {
+      if (!userId) {
+        setNotifications([])
+        setLoading(false)
         return
       }
 
-      setNotifications((data as Notification[]) ?? [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch notifications')
-    } finally {
-      setLoading(false)
-    }
-  }, [userId, limit, supabase])
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
+      try {
+        if (!isBackground) {
+          setLoading(true)
+        }
+        setError(null)
+
+        const { data, error: fetchError } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+
+        if (fetchError) {
+          setError(fetchError.message)
+          return
+        }
+
+        setNotifications((data as Notification[]) ?? [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch notifications')
+      } finally {
+        if (!isBackground) {
+          setLoading(false)
+        }
+        isFetchingRef.current = false
+      }
+    },
+    [userId, limit, supabase]
+  )
 
   // ---- Mark single notification as read ----
   const markAsRead = useCallback(
@@ -115,17 +127,25 @@ export function useNotifications(
     )
   }, [userId, supabase])
 
-  // ---- Initial fetch & 5-second polling interval ----
+  // ---- Initial fetch & stable 15-second background sync ----
   useEffect(() => {
-    fetchNotifications()
+    if (!userId) {
+      setLoading(false)
+      return
+    }
 
-    // 5-second auto-poll ensuring instant delivery of notifications and bell badge updates
+    fetchNotifications(false)
+
+    // Gentle 15-second polling ensuring battery/data efficiency and no server storms
     const interval = setInterval(() => {
-      fetchNotifications()
-    }, 5000)
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return // Skip polling if user minimized tab or phone screen locked
+      }
+      fetchNotifications(true)
+    }, 15000)
 
     return () => clearInterval(interval)
-  }, [fetchNotifications])
+  }, [userId, fetchNotifications])
 
   // ---- Real-time subscription ----
   useEffect(() => {
@@ -183,6 +203,6 @@ export function useNotifications(
     error,
     markAsRead,
     markAllAsRead,
-    refresh: fetchNotifications,
+    refresh: () => fetchNotifications(false),
   }
 }

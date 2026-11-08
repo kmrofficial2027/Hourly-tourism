@@ -98,8 +98,15 @@ function CustomerBookingsContent() {
     'Other reason',
   ]
 
-  const fetchBookings = async () => {
-    setLoading(true)
+  const isFetchingRef = React.useRef(false)
+
+  const fetchBookings = async (isBackground = false) => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+
+    if (!isBackground) {
+      setLoading(true)
+    }
     try {
       const res = await fetch('/api/bookings?role=customer')
       if (res.ok) {
@@ -129,17 +136,23 @@ function CustomerBookingsContent() {
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!isBackground) {
+        setLoading(false)
+      }
+      isFetchingRef.current = false
     }
   }
 
   useEffect(() => {
-    fetchBookings()
+    fetchBookings(false)
 
-    // Rapid 5-second polling interval so changes made by host update without manual reload
+    // Battery-efficient background sync every 8 seconds (skips if tab minimized)
     const interval = setInterval(() => {
-      fetchBookings()
-    }, 5000)
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      fetchBookings(true)
+    }, 8000)
 
     return () => clearInterval(interval)
   }, [highlightBookingId])
