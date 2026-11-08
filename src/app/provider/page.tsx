@@ -125,6 +125,13 @@ export default function ProviderOverviewPage() {
     }
 
     loadData()
+
+    // 5-second background auto-refresh for provider overview stats and incoming bookings
+    const interval = setInterval(() => {
+      loadData()
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const [togglingOnline, setTogglingOnline] = useState(false)

@@ -147,9 +147,15 @@ export default function ProviderBookingsPage() {
       )
       .subscribe()
 
+    // Rapid 5-second polling interval delivering new incoming booking requests without manual reload
+    const pollInterval = setInterval(() => {
+      loadBookings()
+    }, 5000)
+
     return () => {
       window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)
       supabase.removeChannel(channel)
+      clearInterval(pollInterval)
       stopContinuousProviderBuzzer()
     }
   }, [])

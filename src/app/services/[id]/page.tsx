@@ -1740,7 +1740,7 @@ export default function ServiceDetailPage() {
 
           {/* Right Sticky Column: Hourly Booking Engine */}
           <div className="lg:col-span-5">
-            <div className="sticky top-24">
+            <div className="sticky top-24" id="hourly-booking-engine-card">
               <BookingForm
                 listingId={listing.id}
                 hourlyRate={Number(listing.hourly_rate)}
@@ -1823,6 +1823,31 @@ export default function ServiceDetailPage() {
           </div>
         </Modal>
       )}
+
+      {/* ── MOBILE STICKY FLOATING QUICK-BOOKING BAR (ZERO-SCROLL INSTANT ACCESS) ── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3 shadow-2xl flex items-center justify-between gap-3">
+        <div>
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Starts at</span>
+          <div className="flex items-baseline space-x-1">
+            <span className="text-xl font-black text-[#0a4d29]">
+              {CURRENCY_SYMBOL}{Number(listing.hourly_rate).toLocaleString('en-IN')}
+            </span>
+            <span className="text-xs font-semibold text-gray-500">/ hour</span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            const formEl = document.getElementById('hourly-booking-engine-card')
+            if (formEl) {
+              formEl.scrollIntoView({ behavior: 'smooth' })
+            }
+          }}
+          className="px-5 py-2.5 rounded-2xl bg-[#ff7a00] hover:bg-[#e06c00] text-white font-black text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
+        >
+          <span>Instant Book & Pay Now ↗</span>
+        </button>
+      </div>
 
       <Footer />
     </div>

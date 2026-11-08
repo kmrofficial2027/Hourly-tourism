@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   User,
@@ -19,19 +19,24 @@ import {
   ArrowRight,
   ExternalLink,
   Sparkles,
+  Camera,
+  Upload,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { showToast } from '@/components/ui/Toast'
 import { useAuth } from '@/hooks/useAuth'
+import { compressImageFile } from '@/lib/utils'
 
 export default function ProviderProfilePage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [businessName, setBusinessName] = useState('')
   const [phone, setPhone] = useState('')
   const [city, setCity] = useState('')
   const [email, setEmail] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [totalListings, setTotalListings] = useState(0)
   const [activeListings, setActiveListings] = useState(0)
@@ -39,6 +44,7 @@ export default function ProviderProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch live provider profile & status
   useEffect(() => {
@@ -58,6 +64,9 @@ export default function ProviderProfilePage() {
           if (data.email) setEmail(data.email)
           else if (user?.email) setEmail(user.email)
 
+          if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
+          else if (profile?.avatar_url) setAvatarUrl(profile.avatar_url)
+
           if (typeof data.isOnline === 'boolean') {
             setIsOnline(data.isOnline)
           }
@@ -74,6 +83,36 @@ export default function ProviderProfilePage() {
 
     loadProfile()
   }, [profile, user])
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingAvatar(true)
+    try {
+      showToast.loading('Optimizing host logo/avatar...')
+      const compressed = await compressImageFile(file, 300, 0.85)
+      setAvatarUrl(compressed)
+
+      const res = await fetch('/api/provider/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: compressed }),
+      })
+
+      if (res.ok) {
+        showToast.success('Host photo / logo updated successfully!')
+        if (refreshProfile) refreshProfile()
+      } else {
+        showToast.error('Failed to update host avatar.')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast.error('Error processing host avatar.')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   // Handle Switching Active (Online) / Offline
   const handleToggleOnlineStatus = async (newOnlineState: boolean) => {
@@ -125,11 +164,13 @@ export default function ProviderProfilePage() {
           businessName,
           phone,
           city,
+          avatar_url: avatarUrl,
         }),
       })
 
       if (res.ok) {
         showToast.success('Provider profile details updated!')
+        if (refreshProfile) refreshProfile()
       } else {
         const errData = await res.json()
         showToast.error(errData.error || 'Failed to save profile')
@@ -300,21 +341,62 @@ export default function ProviderProfilePage() {
                 2. HOST PROFILE & BUSINESS IDENTITY
             ══════════════════════════════════════════════════ */}
             <form onSubmit={handleSave} className="space-y-6">
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
+
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center space-x-4 pb-4 border-b border-gray-100">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-[#0a4d29] flex items-center justify-center font-black text-xl">
-                    {businessName ? businessName.slice(0, 2).toUpperCase() : 'HT'}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative group">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt="Host Logo"
+                          className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-[#0a4d29] flex items-center justify-center font-black text-xl border-2 border-emerald-200">
+                          {businessName ? businessName.slice(0, 2).toUpperCase() : 'HT'}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        title="Upload Host Avatar / Logo"
+                        className="absolute inset-0 bg-black/40 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[10px] font-bold"
+                      >
+                        <Camera className="w-4 h-4 mb-0.5" />
+                        Upload
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-base">
+                        {businessName || 'Your Business Name'}
+                      </h3>
+                      <p className="text-xs text-gray-500">{email || user?.email || 'provider@hourlytourism.com'}</p>
+                      <span className="inline-flex items-center text-[10px] text-emerald-700 font-bold uppercase mt-1">
+                        <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                        {verificationStatus === 'approved' ? 'Verified Host Partner' : 'Verification Under Review'}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base">
-                      {businessName || 'Your Business Name'}
-                    </h3>
-                    <p className="text-xs text-gray-500">{email || user?.email || 'provider@hourlytourism.com'}</p>
-                    <span className="inline-flex items-center text-[10px] text-emerald-700 font-bold uppercase mt-1">
-                      <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                      {verificationStatus === 'approved' ? 'Verified Host Partner' : 'Verification Under Review'}
-                    </span>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition-colors flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Change Host Photo / Logo</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

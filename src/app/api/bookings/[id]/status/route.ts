@@ -8,9 +8,22 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createServerSupabaseClient()
-    const {
+    let {
       data: { user },
     } = await supabase.auth.getUser()
+
+    const adminSupabase = await createAdminSupabaseClient()
+
+    if (!user) {
+      const authHeader = request.headers.get('authorization')
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        const { data: userData } = await adminSupabase.auth.getUser(token)
+        if (userData?.user) {
+          user = userData.user
+        }
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,8 +31,6 @@ export async function PATCH(
 
     const { status, reason, notes, payment_status, entered_otp, payment_method } = await request.json()
     const bookingId = params.id
-
-    const adminSupabase = await createAdminSupabaseClient()
 
     // Fetch existing booking
     const { data: booking, error: fetchErr } = await adminSupabase
@@ -82,6 +93,21 @@ export async function PATCH(
     if (updateErr) {
       console.error('Booking status update error:', updateErr)
       return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    // Insert payment record if payment completed
+    if (updateData.payment_status === 'completed') {
+      try {
+        await adminSupabase.from('payments').insert({
+          booking_id: bookingId,
+          amount: booking.total_amount || 0,
+          currency: 'INR',
+          status: 'completed',
+          payment_method: payment_method || (notes?.includes('QR') ? 'provider_upi_qr' : 'cash_on_site'),
+        })
+      } catch (payErr) {
+        console.warn('Payment record log note (non-fatal):', payErr)
+      }
     }
 
     // Insert audit log in booking_status_history

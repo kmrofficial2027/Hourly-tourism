@@ -24,32 +24,9 @@ export async function GET(
       .select(`
         *,
         service_listings (
-          id,
-          title,
-          category,
-          images,
-          destination_city,
-          destination_state,
-          hourly_rate,
-          minimum_hours,
-          cancellation_hours,
-          cancellation_fee_percent,
-          vehicle_details (
-            vehicle_type,
-            make,
-            model,
-            year,
-            color,
-            registration_number,
-            fuel_type,
-            transmission,
-            seating_capacity
-          ),
-          guide_details (
-            languages,
-            specializations,
-            experience_years
-          )
+          *,
+          vehicle_details (*),
+          guide_details (*)
         ),
         customer:customer_id (
           id,
@@ -71,6 +48,10 @@ export async function GET(
       .eq('id', bookingId)
       .maybeSingle()
 
+    if (error) {
+      console.error('Error fetching booking with joins:', error)
+    }
+
     if (error || !booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
@@ -82,9 +63,19 @@ export async function GET(
       .eq('id', user.id)
       .maybeSingle()
 
+    const { data: provProfile } = await adminSupabase
+      .from('provider_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
     const isAdmin = profile?.role === 'admin'
     const isCustomer = booking.customer_id === user.id
-    const isProvider = booking.provider_profile?.user_id === user.id
+    const isProvider =
+      booking.provider_profile?.user_id === user.id ||
+      booking.provider_id === user.id ||
+      (provProfile && booking.provider_id === provProfile.id) ||
+      (booking.service_listings?.provider_id && provProfile && booking.service_listings.provider_id === provProfile.id)
 
     if (!isAdmin && !isCustomer && !isProvider) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })

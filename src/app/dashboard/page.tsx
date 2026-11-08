@@ -137,6 +137,13 @@ export default function CustomerDashboardPage() {
     }
 
     loadBookings()
+
+    // 5-second auto-refresh for customer overview trips and active bookings
+    const interval = setInterval(() => {
+      loadBookings()
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   // Partition bookings

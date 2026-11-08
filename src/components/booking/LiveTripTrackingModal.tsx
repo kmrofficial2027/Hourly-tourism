@@ -32,6 +32,19 @@ export interface LiveTripTrackingModalProps {
   onOpenOtpModal?: () => void
 }
 
+// Haversine formula to compute exact distance in kilometers between two GPS coordinates
+function computeHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371 // Earth radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180)
+  const dLon = (lon2 - lon1) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return Number((R * c).toFixed(2))
+}
+
 export function LiveTripTrackingModal({
   isOpen,
   onClose,
@@ -52,8 +65,8 @@ export function LiveTripTrackingModal({
 
   // Live Simulated or Real GPS Coordinates
   const [providerCoords, setProviderCoords] = useState({
-    lat: defaultLat + 0.006,
-    lng: defaultLng - 0.005,
+    lat: defaultLat + 0.009,
+    lng: defaultLng - 0.007,
   })
   const [customerCoords, setCustomerCoords] = useState({
     lat: defaultLat,
@@ -61,10 +74,32 @@ export function LiveTripTrackingModal({
   })
 
   const [isSharingLiveGps, setIsSharingLiveGps] = useState(false)
-  const [distanceKm, setDistanceKm] = useState(1.2)
-  const [etaMinutes, setEtaMinutes] = useState(4)
-  const [speedKmh, setSpeedKmh] = useState(34)
+  const [distanceKm, setDistanceKm] = useState(1.4)
+  const [etaText, setEtaText] = useState('~4 mins')
+  const [speedKmh, setSpeedKmh] = useState(32)
   const watchIdRef = useRef<number | null>(null)
+
+  // Recalculate distance and ETA dynamically whenever either coordinate updates
+  useEffect(() => {
+    const dist = computeHaversineDistanceKm(
+      providerCoords.lat,
+      providerCoords.lng,
+      customerCoords.lat,
+      customerCoords.lng
+    )
+    setDistanceKm(dist)
+
+    const effectiveSpeed = Math.max(25, speedKmh)
+    const minutesTotal = Math.max(1, Math.round((dist / effectiveSpeed) * 60))
+
+    if (minutesTotal >= 60) {
+      const hrs = Math.floor(minutesTotal / 60)
+      const mins = minutesTotal % 60
+      setEtaText(`~${hrs} hr${hrs > 1 ? 's' : ''} ${mins > 0 ? `${mins} min` : ''}`)
+    } else {
+      setEtaText(`~${minutesTotal} min${minutesTotal > 1 ? 's' : ''}`)
+    }
+  }, [providerCoords, customerCoords, speedKmh])
 
   // Simulate subtle vehicle movement towards pickup point when trip is confirmed or in progress
   useEffect(() => {
@@ -73,22 +108,15 @@ export function LiveTripTrackingModal({
     const interval = setInterval(() => {
       setProviderCoords((prev) => {
         // Move slightly closer to customer location
-        const stepLat = (customerCoords.lat - prev.lat) * 0.04
-        const stepLng = (customerCoords.lng - prev.lng) * 0.04
+        const stepLat = (customerCoords.lat - prev.lat) * 0.05
+        const stepLng = (customerCoords.lng - prev.lng) * 0.05
         return {
           lat: prev.lat + stepLat,
           lng: prev.lng + stepLng,
         }
       })
 
-      // Update distance & ETA smoothly
-      setDistanceKm((prev) => {
-        const next = Math.max(0.1, Number((prev - 0.05).toFixed(1)))
-        setEtaMinutes(Math.max(1, Math.ceil(next * 3)))
-        return next
-      })
-
-      setSpeedKmh(Math.floor(28 + Math.random() * 10))
+      setSpeedKmh(Math.floor(28 + Math.random() * 12))
     }, 3000)
 
     return () => clearInterval(interval)
@@ -194,19 +222,19 @@ export function LiveTripTrackingModal({
         <div className="grid grid-cols-3 gap-3">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
             <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">
-              Distance
+              Exact Distance
             </span>
             <span className="text-lg font-black text-slate-900">{distanceKm} km</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-200 text-center">
             <span className="text-[10px] uppercase font-bold text-orange-600 block tracking-wider">
-              Est. Arrival
+              Est. Meetup ETA
             </span>
-            <span className="text-lg font-black text-[#ff7a00]">~{etaMinutes} mins</span>
+            <span className="text-lg font-black text-[#ff7a00]">{etaText}</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
             <span className="text-[10px] uppercase font-bold text-emerald-700 block tracking-wider">
-              Telemetry Speed
+              Live Vehicle Speed
             </span>
             <span className="text-lg font-black text-emerald-900">{speedKmh} km/h</span>
           </div>
@@ -254,6 +282,28 @@ export function LiveTripTrackingModal({
               <Navigation className="w-3.5 h-3.5 text-emerald-300" />
               <span>Turn-by-Turn Directions ↗</span>
             </a>
+          </div>
+        </div>
+
+        {/* Exact Dual Locations Comparison Card (Distance in km & Meetup ETA) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs">
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0 animate-ping" />
+            <div>
+              <span className="font-bold text-gray-900 block">Host Exact Location</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {host.businessName || host.name || 'Verified Local Host'} • Coordinates: ({providerCoords.lat.toFixed(4)}, {providerCoords.lng.toFixed(4)})
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ff7a00] mt-1 shrink-0" />
+            <div>
+              <span className="font-bold text-gray-900 block">Tourist Pickup Point</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {booking.pickup_location || listing.destination_city || 'Designated Pickup'} • Coordinates: ({customerCoords.lat.toFixed(4)}, {customerCoords.lng.toFixed(4)})
+              </p>
+            </div>
           </div>
         </div>
 
@@ -327,6 +377,28 @@ export function LiveTripTrackingModal({
           </div>
         </div>
 
+        {/* Exact Dual Locations Comparison Card (Distance in km & Meetup ETA) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs">
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0 animate-ping" />
+            <div>
+              <span className="font-bold text-gray-900 block">Host Exact Location</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {host.businessName || host.name || 'Verified Local Host'} • Coordinates: ({providerCoords.lat.toFixed(4)}, {providerCoords.lng.toFixed(4)})
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ff7a00] mt-1 shrink-0" />
+            <div>
+              <span className="font-bold text-gray-900 block">Tourist Pickup Point</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {booking.pickup_location || listing.destination_city || 'Designated Pickup'} • Coordinates: ({customerCoords.lat.toFixed(4)}, {customerCoords.lng.toFixed(4)})
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Modal Footer Controls */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div className="flex items-center space-x-2 text-[11px] text-gray-400">
@@ -352,6 +424,28 @@ export function LiveTripTrackingModal({
             <Button variant="secondary" size="sm" onClick={onClose}>
               Close Radar
             </Button>
+          </div>
+        </div>
+
+        {/* Exact Dual Locations Comparison Card (Distance in km & Meetup ETA) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs">
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0 animate-ping" />
+            <div>
+              <span className="font-bold text-gray-900 block">Host Exact Location</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {host.businessName || host.name || 'Verified Local Host'} • Coordinates: ({providerCoords.lat.toFixed(4)}, {providerCoords.lng.toFixed(4)})
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ff7a00] mt-1 shrink-0" />
+            <div>
+              <span className="font-bold text-gray-900 block">Tourist Pickup Point</span>
+              <p className="text-gray-500 text-[11px] mt-0.5">
+                {booking.pickup_location || listing.destination_city || 'Designated Pickup'} • Coordinates: ({customerCoords.lat.toFixed(4)}, {customerCoords.lng.toFixed(4)})
+              </p>
+            </div>
           </div>
         </div>
       </div>

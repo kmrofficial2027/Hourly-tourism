@@ -84,6 +84,7 @@ export async function GET() {
       totalListings,
       activeListings,
       verificationStatus: providerProfile?.verification_status || 'pending',
+      avatarUrl: userProfile?.avatar_url || '',
     }
 
     profileCache.set(user.id, { data: responsePayload, ts: Date.now() })
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { businessName, phone, city, isOnline } = body
+    const { businessName, phone, city, isOnline, avatar_url } = body
 
     const adminSupabase = await createAdminSupabaseClient()
 
@@ -200,14 +201,17 @@ export async function POST(request: Request) {
         .eq('user_id', user.id)
     }
 
-    if (businessName !== undefined || phone !== undefined) {
+    if (businessName !== undefined || phone !== undefined || avatar_url !== undefined) {
+      const profileUpdates: any = {
+        updated_at: new Date().toISOString(),
+      }
+      if (businessName !== undefined) profileUpdates.full_name = businessName ? businessName.trim() : undefined
+      if (phone !== undefined) profileUpdates.phone = phone !== undefined ? phone.trim() : undefined
+      if (avatar_url !== undefined) profileUpdates.avatar_url = avatar_url
+
       await adminSupabase
         .from('profiles')
-        .update({
-          full_name: businessName ? businessName.trim() : undefined,
-          phone: phone !== undefined ? phone.trim() : undefined,
-          updated_at: new Date().toISOString(),
-        })
+        .update(profileUpdates)
         .eq('id', user.id)
     }
 

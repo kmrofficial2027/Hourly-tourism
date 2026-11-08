@@ -87,6 +87,7 @@ function CustomerBookingsContent() {
   const [providerQrInfo, setProviderQrInfo] = useState<any | null>(null)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
+  const hasAutoOpenedPayModalRef = React.useRef(false)
 
   const TOURIST_CANCEL_REASONS = [
     'Change of travel plans / Destination change',
@@ -111,13 +112,15 @@ function CustomerBookingsContent() {
           if (match) {
             setSelectedBooking(match)
             if (
+              !hasAutoOpenedPayModalRef.current &&
               defaultAction === 'pay' &&
               match.payment_status !== 'completed' &&
               match.status !== 'confirmed'
             ) {
+              hasAutoOpenedPayModalRef.current = true
               handlePayNow(match)
               if (typeof window !== 'undefined') {
-                window.history.replaceState({}, '', `/dashboard/bookings?bookingId=${match.id}`)
+                window.history.replaceState({}, '', '/dashboard/bookings')
               }
             }
           }
@@ -132,6 +135,13 @@ function CustomerBookingsContent() {
 
   useEffect(() => {
     fetchBookings()
+
+    // Rapid 5-second polling interval so changes made by host update without manual reload
+    const interval = setInterval(() => {
+      fetchBookings()
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [highlightBookingId])
 
   // Realtime audio intimation when host accepts (Joyful Chime) or declines (Alert Tone)
@@ -277,17 +287,26 @@ function CustomerBookingsContent() {
     setPayLoading(true)
 
     try {
+      const session = (await createClient().auth.getSession()).data.session
+      const authHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (session?.access_token) {
+        authHeaders['Authorization'] = `Bearer ${session.access_token}`
+      }
+
       // 1. Direct Provider UPI QR Code (On-Site Immediate)
       if (gatewayChoice === 'provider_qr') {
         const res = await fetch(`/api/bookings/${paymentModalBooking.id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
-            status: ['pending', 'unpaid', 'awaiting_confirmation'].includes(paymentModalBooking.status)
+            status: ['pending', 'unpaid', 'awaiting_confirmation', 'payment_pending'].includes(paymentModalBooking.status)
               ? 'confirmed'
               : paymentModalBooking.status,
             payment_status: 'completed',
             notes: 'Paid via direct Provider UPI QR code on-site',
+            payment_method: 'provider_upi_qr',
           }),
         })
 
@@ -310,11 +329,12 @@ function CustomerBookingsContent() {
       if (gatewayChoice === 'pay_after_ride') {
         const res = await fetch(`/api/bookings/${paymentModalBooking.id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             status: 'pending',
             payment_status: 'pending',
             notes: 'Pay after ride completes (on-site cash or host QR upon destination arrival)',
+            payment_method: 'pay_after_ride',
           }),
         })
 

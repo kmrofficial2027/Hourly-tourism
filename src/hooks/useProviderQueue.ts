@@ -8,6 +8,10 @@ import {
   startContinuousProviderBuzzer,
   stopContinuousProviderBuzzer,
 } from '@/lib/soundUtils'
+import {
+  requestNotificationPermission,
+  triggerProviderBookingPushNotification,
+} from '@/lib/pushNotificationUtils'
 
 export function useProviderQueue(providerId?: string) {
   const [pendingCount, setPendingCount] = useState(0)
@@ -15,6 +19,11 @@ export function useProviderQueue(providerId?: string) {
   const [hasNewPing, setHasNewPing] = useState(false)
   const previousCountRef = useRef<number | null>(null)
   const isFetchingRef = useRef<boolean>(false)
+
+  // Request browser push notification permission once on mount
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
 
   const fetchPending = useCallback(async () => {
     if (isFetchingRef.current) return
@@ -32,10 +41,11 @@ export function useProviderQueue(providerId?: string) {
         )
         const newCount = activeBookings.length
 
-        // If new pending booking arrived, start continuous buzzer until accepted/declined
+        // If pending booking exists or new arrived, keep buzzer ringing and trigger notification
         if (pendingBookings.length > 0) {
-          if (previousCountRef.current !== null && newCount > previousCountRef.current) {
-            startContinuousProviderBuzzer()
+          startContinuousProviderBuzzer()
+          if (previousCountRef.current === null || newCount > previousCountRef.current) {
+            triggerProviderBookingPushNotification(pendingBookings[0])
             showToast.success('🚗 New Hourly Booking Request Received! Buzzer ringing.')
           }
         } else {
@@ -78,8 +88,9 @@ export function useProviderQueue(providerId?: string) {
               setPendingCount((prev) => prev + 1)
               setLatestPendingBooking(booking)
               setHasNewPing(true)
-              // START CONTINUOUS BUZZER UNTIL ACCEPTED OR DECLINED
+              // START CONTINUOUS BUZZER & SYSTEM NOTIFICATION
               startContinuousProviderBuzzer()
+              triggerProviderBookingPushNotification(booking)
               showToast.success('⚡ New Booking Request! Accept or Decline to stop buzzer alert.')
               setTimeout(() => setHasNewPing(false), 8000)
             } else if (['confirmed', 'rejected', 'cancelled'].includes(booking.status)) {
@@ -92,11 +103,10 @@ export function useProviderQueue(providerId?: string) {
       )
       .subscribe()
 
-    // 45-second background polling fallback (only active when tab is visible)
+    // Rapid 5-second background polling ensuring instant alert delivery
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return
       fetchPending()
-    }, 45000)
+    }, 5000)
 
     return () => {
       supabase.removeChannel(channel)

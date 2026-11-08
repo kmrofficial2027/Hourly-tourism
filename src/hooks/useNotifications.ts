@@ -115,9 +115,16 @@ export function useNotifications(
     )
   }, [userId, supabase])
 
-  // ---- Initial fetch ----
+  // ---- Initial fetch & 5-second polling interval ----
   useEffect(() => {
     fetchNotifications()
+
+    // 5-second auto-poll ensuring instant delivery of notifications and bell badge updates
+    const interval = setInterval(() => {
+      fetchNotifications()
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [fetchNotifications])
 
   // ---- Real-time subscription ----

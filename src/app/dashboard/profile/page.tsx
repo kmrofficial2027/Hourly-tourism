@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   MapPin,
   Plus,
@@ -15,6 +15,8 @@ import {
   Plane,
   Train,
   CheckCircle2,
+  Camera,
+  Upload,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Input } from '@/components/ui/Input'
@@ -22,12 +24,52 @@ import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { showToast } from '@/components/ui/Toast'
 import { useAuth } from '@/hooks/useAuth'
+import { compressImageFile } from '@/lib/utils'
 
 export default function CustomerProfilePage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [fullName, setFullName] = useState(profile?.full_name || 'Verified Explorer')
   const [phone, setPhone] = useState(profile?.phone || '+91 98421 55678')
+  const [avatarUrl, setAvatarUrl] = useState<string>(profile?.avatar_url || '')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [loading, setLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (profile?.full_name) setFullName(profile.full_name)
+    if (profile?.phone) setPhone(profile.phone)
+    if (profile?.avatar_url) setAvatarUrl(profile.avatar_url)
+  }, [profile])
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingAvatar(true)
+    try {
+      showToast.loading('Optimizing profile photo...')
+      const compressed = await compressImageFile(file, 300, 0.85)
+      setAvatarUrl(compressed)
+
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: compressed }),
+      })
+
+      if (res.ok) {
+        showToast.success('Profile picture updated successfully!')
+        if (refreshProfile) refreshProfile()
+      } else {
+        showToast.error('Failed to save profile picture.')
+      }
+    } catch (err) {
+      console.error('Avatar upload error:', err)
+      showToast.error('Error processing profile picture.')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   // Saved Addresses State
   const [savedAddresses, setSavedAddresses] = useState([
@@ -73,9 +115,25 @@ export default function CustomerProfilePage() {
     e.preventDefault()
     setLoading(true)
     try {
-      showToast.success('Profile and preferences updated successfully')
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName,
+          phone,
+          avatar_url: avatarUrl,
+        }),
+      })
+
+      if (res.ok) {
+        showToast.success('Profile and preferences updated successfully!')
+        if (refreshProfile) refreshProfile()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast.error(data.error || 'Failed to update profile.')
+      }
     } catch (err: any) {
-      showToast.error('Failed to update profile')
+      showToast.error('Network error updating profile.')
     } finally {
       setLoading(false)
     }
@@ -110,19 +168,51 @@ export default function CustomerProfilePage() {
   return (
     <DashboardLayout role="customer" title="Profile Settings & Preferences">
       <div className="max-w-4xl space-y-8">
-        {/* Profile Card Header */}
+        {/* Hidden File Input for Avatar */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleAvatarFileChange}
+        />
+
+        {/* Profile Card Header with Photo Upload */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex items-center space-x-4">
-            <Avatar
-              src={profile?.avatar_url}
-              name={fullName || user?.email}
-              size="xl"
-            />
+            <div className="relative group">
+              <Avatar
+                src={avatarUrl || profile?.avatar_url}
+                name={fullName || user?.email}
+                size="xl"
+                className="w-20 h-20 border-2 border-emerald-500/30"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                title="Upload Profile Picture"
+                className="absolute inset-0 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[10px] font-bold"
+              >
+                <Camera className="w-5 h-5 mb-0.5" />
+                Upload
+              </button>
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 font-display">
-                {fullName || 'Explorer'}
-              </h2>
-              <p className="text-xs text-gray-400">{user?.email}</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-gray-900 font-display">
+                  {fullName || 'Explorer'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-200 transition-colors flex items-center gap-1"
+                >
+                  <Upload className="w-3 h-3 text-emerald-700" />
+                  Change Photo
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
               <div className="flex items-center space-x-2 mt-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                   Verified Tourist ID

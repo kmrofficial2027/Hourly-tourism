@@ -210,6 +210,30 @@ export function BookingForm({
       </div>
 
       <form onSubmit={handleProceedToPayment} className="mt-5 space-y-4">
+        {/* ── FAST 1-CLICK INSTANT BOOKING BAR (TOP OF FORM - ZERO SCROLL REQUIRED) ── */}
+        <div className="p-3 bg-gradient-to-r from-emerald-50 to-orange-50 rounded-2xl border border-emerald-200/80 flex items-center justify-between gap-2 shadow-xs">
+          <div>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Amount</span>
+            <div className="flex items-baseline">
+              <span className="text-xl font-black text-[#0a4d29]">
+                {CURRENCY_SYMBOL}{priceDetails.totalAmount.toLocaleString('en-IN')}
+              </span>
+              <span className="text-[11px] text-gray-500 ml-1.5 font-bold">({effectiveDuration} hr{effectiveDuration > 1 ? 's' : ''})</span>
+            </div>
+          </div>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            isLoading={loading || availabilityChecking}
+            disabled={Boolean(availabilityError)}
+            className="bg-[#ff7a00] hover:bg-[#e06c00] font-black text-xs px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all"
+          >
+            <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+            Instant Book & Pay
+          </Button>
+        </div>
+
         {/* Package vs Custom Toggle (if packages available) */}
         {hasPackages && (
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-2xl">

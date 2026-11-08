@@ -69,8 +69,37 @@ export function useRealtimeBooking(bookingId: string | null | undefined, onStatu
         }
       })
 
+    // Rapid 5-second polling check guaranteeing immediate status sync between tourist and host
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}`)
+        if (res.ok) {
+          const data = await res.json()
+          const b = data.booking
+          if (b?.status) {
+            setRealtimeState((prev) => {
+              if (prev.status && prev.status !== b.status) {
+                if (b.status === 'confirmed') playBookingAcceptedSound()
+                else if (b.status === 'rejected' || b.status === 'cancelled') playBookingRejectedSound()
+                if (onStatusChange) onStatusChange(b.status, b)
+              }
+              return {
+                status: b.status,
+                updatedPayload: b,
+                lastUpdated: new Date(),
+                isConnected: true,
+              }
+            })
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    }, 5000)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(pollInterval)
     }
   }, [bookingId, onStatusChange])
 

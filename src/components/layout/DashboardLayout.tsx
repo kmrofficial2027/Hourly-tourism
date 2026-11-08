@@ -33,6 +33,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
 import { Logo } from '@/components/ui/Logo'
 import { NotificationCenter } from '@/components/notifications/NotificationCenter'
+import { ProviderGlobalAlerts, CustomerGlobalAlerts } from '@/components/layout/GlobalAlerts'
 
 export interface DashboardLayoutProps {
   children: React.ReactNode
@@ -322,6 +323,10 @@ export function DashboardLayout({
 
       {/* ── MAIN CONTENT AREA ──────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* ── Global Realtime Audio & Buzzer Alert Bars (Provider & Customer) ── */}
+        {role === 'provider' && <ProviderGlobalAlerts />}
+        {role === 'customer' && <CustomerGlobalAlerts />}
+
         {/* ── Top Header Bar (Taller, prominent & mobile-centered logo) ── */}
         <header className="sticky top-0 z-30 h-20 sm:h-22 bg-white/95 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm">
           {/* Left: Hamburger (mobile) or Page Title (desktop) */}
