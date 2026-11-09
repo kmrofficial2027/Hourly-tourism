@@ -168,7 +168,9 @@ function ExploreContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-display">
-                    {filters.category
+                    {filters.category === 'humani'
+                      ? 'Book Human-Ⅰ (Personal Companion) by the Hour'
+                      : filters.category
                       ? `${filters.category.replace(/_/g, ' ').toUpperCase()} by the Hour`
                       : 'Hourly Tourism Services'}
                   </h1>

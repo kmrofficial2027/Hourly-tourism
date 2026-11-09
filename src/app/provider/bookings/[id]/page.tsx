@@ -20,6 +20,7 @@ import {
   TrendingUp,
   DollarSign,
   Car,
+  Navigation,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/Button'
@@ -27,6 +28,7 @@ import { BookingStatusBadge } from '@/components/booking/BookingStatusBadge'
 import { BookingTimeline } from '@/components/booking/BookingTimeline'
 import { BookingCancelModal } from '@/components/booking/BookingCancelModal'
 import { BookingChatModal } from '@/components/booking/BookingChatModal'
+import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -54,6 +56,7 @@ export default function ProviderBookingDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showNoShowModal, setShowNoShowModal] = useState(false)
   const [showOtpModal, setShowOtpModal] = useState(false)
+  const [showTrackingModal, setShowTrackingModal] = useState(false)
   const [enteredOtp, setEnteredOtp] = useState('')
   const [otpError, setOtpError] = useState<string | null>(null)
   const [otpLoading, setOtpLoading] = useState(false)
@@ -267,6 +270,17 @@ export default function ProviderBookingDetailPage() {
                 <span className="live-badge-dot" />
                 <span>Live Sync</span>
               </span>
+            )}
+            {['confirmed', 'driver_on_the_way', 'in_progress'].includes(booking.status) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowTrackingModal(true)}
+                className="bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold"
+              >
+                <Navigation className="w-3.5 h-3.5 mr-1 text-emerald-600 animate-pulse" />
+                Live Trip Radar
+              </Button>
             )}
             <BookingStatusBadge status={booking.status} />
             <Button
@@ -764,6 +778,16 @@ export default function ProviderBookingDetailPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {showTrackingModal && (
+        <LiveTripTrackingModal
+          isOpen={true}
+          onClose={() => setShowTrackingModal(false)}
+          booking={booking}
+          role="provider"
+          onOpenOtpModal={() => setShowOtpModal(true)}
+        />
       )}
     </DashboardLayout>
   )

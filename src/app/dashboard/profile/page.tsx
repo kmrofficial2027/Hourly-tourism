@@ -25,12 +25,13 @@ import { Avatar } from '@/components/ui/Avatar'
 import { showToast } from '@/components/ui/Toast'
 import { useAuth } from '@/hooks/useAuth'
 import { compressImageFile } from '@/lib/utils'
+import { DEFAULT_AVATARS } from '@/lib/constants'
 
 export default function CustomerProfilePage() {
   const { user, profile, refreshProfile } = useAuth()
   const [fullName, setFullName] = useState(profile?.full_name || 'Verified Explorer')
   const [phone, setPhone] = useState(profile?.phone || '+91 98421 55678')
-  const [avatarUrl, setAvatarUrl] = useState<string>(profile?.avatar_url || '')
+  const [avatarUrl, setAvatarUrl] = useState<string>(profile?.avatar_url || DEFAULT_AVATARS.tourist)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -39,6 +40,7 @@ export default function CustomerProfilePage() {
     if (profile?.full_name) setFullName(profile.full_name)
     if (profile?.phone) setPhone(profile.phone)
     if (profile?.avatar_url) setAvatarUrl(profile.avatar_url)
+    else setAvatarUrl(DEFAULT_AVATARS.tourist)
   }, [profile])
 
   const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +184,8 @@ export default function CustomerProfilePage() {
           <div className="flex items-center space-x-4">
             <div className="relative group">
               <Avatar
-                src={avatarUrl || profile?.avatar_url}
+                src={avatarUrl || profile?.avatar_url || DEFAULT_AVATARS.tourist}
+                role="customer"
                 name={fullName || user?.email}
                 size="xl"
                 className="w-20 h-20 border-2 border-emerald-500/30"

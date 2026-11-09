@@ -48,6 +48,8 @@ export function Header() {
   const navLinks = [
     { label: 'Home', href: '/' },
     { label: 'Explore', href: '/explore' },
+    { label: 'Book Human-Ⅰ', href: '/explore?category=humani', badge: 'New' },
+    { label: 'Human-Ⅰ Guide', href: '/guides/book-your-humani' },
     { label: 'Regional Guides', href: '/regional-guides' },
   ]
 
@@ -78,19 +80,24 @@ export function Header() {
           </div>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-            {navLinks.map((link) => {
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-1.5">
+            {navLinks.map((link: any) => {
               const isActive = pathname === link.href
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${isActive
+                  className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all inline-flex items-center gap-1.5 ${isActive
                       ? 'text-[#15803d] bg-green-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
                     }`}
                 >
-                  {link.label}
+                  <span>{link.label}</span>
+                  {link.badge && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-[#ff7a00] text-white tracking-wider leading-none shadow-xs">
+                      {link.badge}
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -252,13 +259,18 @@ export function Header() {
             <Logo variant="header" />
           </div>
           <nav className="flex flex-col space-y-2">
-            {navLinks.map((link) => (
+            {navLinks.map((link: any) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#15803d]"
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#15803d] flex items-center justify-between"
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.badge && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-[#ff7a00] text-white">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             ))}
 

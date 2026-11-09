@@ -22,33 +22,33 @@ export function Logo({
     switch (variant) {
       case 'header':
         return {
-          container: 'h-16 sm:h-20 lg:h-24 flex items-center',
-          image: 'h-14 sm:h-18 lg:h-22 xl:h-24 w-auto object-contain',
+          container: 'flex flex-col items-center justify-center text-center',
+          image: 'h-10 sm:h-12 lg:h-14 w-auto object-contain',
         }
       case 'footer':
         return {
-          container: 'h-20 sm:h-24 flex items-center',
-          image: 'h-18 sm:h-22 w-auto object-contain',
+          container: 'flex flex-col items-start justify-center',
+          image: 'h-16 sm:h-20 w-auto object-contain',
         }
       case 'hero':
         return {
-          container: 'h-28 sm:h-36 md:h-44 flex items-center justify-center',
-          image: 'h-26 sm:h-32 md:h-40 w-auto object-contain drop-shadow-md',
+          container: 'flex flex-col items-center justify-center',
+          image: 'h-24 sm:h-32 md:h-38 w-auto object-contain drop-shadow-md',
         }
       case 'compact':
         return {
-          container: 'h-14 sm:h-16 lg:h-18 flex items-center',
-          image: 'h-13 sm:h-15 lg:h-17 w-auto object-contain',
+          container: 'flex flex-col items-center justify-center',
+          image: 'h-10 sm:h-12 lg:h-14 w-auto object-contain',
         }
       case 'icon':
         return {
-          container: 'w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
+          container: 'w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-emerald-100',
           image: 'w-full h-full object-cover scale-125',
         }
       default:
         return {
-          container: 'h-16 sm:h-20 lg:h-24 flex items-center',
-          image: 'h-14 sm:h-18 lg:h-22 xl:h-24 w-auto object-contain',
+          container: 'flex flex-col items-center justify-center text-center',
+          image: 'h-10 sm:h-12 lg:h-14 w-auto object-contain',
         }
     }
   }
@@ -56,7 +56,7 @@ export function Logo({
   const { container, image } = getVariantStyles()
 
   const content = (
-    <div className={`flex items-center space-x-2.5 group transition-transform ${container} ${className}`}>
+    <div className={`group transition-transform ${container} ${className}`}>
       {/* Real Brand Logo Image */}
       <div className="relative flex items-center justify-center">
         <img
@@ -67,7 +67,7 @@ export function Logo({
       </div>
 
       {showTagline && (
-        <span className="hidden md:inline-block text-[11px] font-semibold text-[#ff7a00] tracking-wide pl-2 border-l border-orange-200">
+        <span className="hidden md:block text-[9px] lg:text-[10px] font-bold text-[#ff7a00] tracking-wider uppercase mt-1 leading-none whitespace-nowrap">
           Discover More. One Hour at a Time.
         </span>
       )}

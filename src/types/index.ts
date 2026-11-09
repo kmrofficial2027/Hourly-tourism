@@ -15,6 +15,7 @@ export type ServiceCategory =
   | 'local_guide'
   | 'sightseeing_tour'
   | 'experience'
+  | 'humani'
 
 export type BookingStatus =
   | 'pending'

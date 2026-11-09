@@ -28,6 +28,7 @@ import {
   HelpCircle,
   Layers,
   BellRing,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
@@ -155,6 +156,7 @@ export function DashboardLayout({
       { label: 'Overview', href: '/admin', icon: LayoutDashboard },
       { label: 'Marketplace Analytics', href: '/admin/analytics', icon: TrendingUp },
       { label: 'Destinations & Cities', href: '/admin/destinations', icon: MapPin },
+      { label: 'Human-Ⅰ Guide & Pricing', href: '/admin/human-guide', icon: Sparkles },
       { label: 'Footer & Category Pages', href: '/admin/footer-pages', icon: Layers },
       { label: 'Push Notifications', href: '/admin/push-notifications', icon: BellRing },
       { label: 'Customers', href: '/admin/customers', icon: Users },
@@ -260,6 +262,7 @@ export function DashboardLayout({
             <div className="relative">
               <Avatar
                 src={profile?.avatar_url}
+                role={role}
                 name={profile?.full_name || user?.email}
                 size="md"
               />
@@ -409,6 +412,7 @@ export function DashboardLayout({
             <div className="hidden sm:block">
               <Avatar
                 src={profile?.avatar_url}
+                role={role}
                 name={profile?.full_name || user?.email}
                 size="sm"
               />

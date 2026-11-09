@@ -161,6 +161,7 @@ export default function BecomeProviderPage() {
                     { label: '🧑‍🏫 Local Tour Guide', value: 'local_guide' },
                     { label: '🗺️ Sightseeing Tours', value: 'sightseeing_tour' },
                     { label: '🎭 Local Experiences', value: 'experience' },
+                    { label: '🤝 Book Human-Ⅰ (Personal Companion & Assistant)', value: 'humani' },
                   ]}
                 />
               </div>

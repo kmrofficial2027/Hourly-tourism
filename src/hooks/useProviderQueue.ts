@@ -109,13 +109,10 @@ export function useProviderQueue(providerId?: string) {
       console.debug('Provider queue realtime subscription skipped:', err)
     }
 
-    // Battery-efficient 8-second background polling ensuring instant alert delivery (skips when tab minimized)
+    // 5-second rapid background polling ensuring instant alert delivery
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
       fetchPending()
-    }, 8000)
+    }, 5000)
 
     return () => {
       if (channel) {

@@ -43,9 +43,14 @@ export function PushNotificationSubscriber() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const supabase = createClient()
+    const uniqueChannelName = `push-broadcasts-${user?.id || 'guest'}-${Math.random().toString(36).substring(2, 9)}`
     let channel: any = null
 
     try {
+      const existing = supabase.getChannels().find((c: any) => c.topic === 'realtime:hourly-push-broadcasts' || c.topic === 'hourly-push-broadcasts')
+      if (existing) {
+        supabase.removeChannel(existing)
+      }
       channel = supabase
         .channel('hourly-push-broadcasts')
         .on('broadcast', { event: 'push_notification' }, (payload: any) => {

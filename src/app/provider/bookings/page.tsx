@@ -164,13 +164,10 @@ export default function ProviderBookingsPage() {
       console.debug('Provider bookings realtime subscription skipped:', err)
     }
 
-    // Battery-efficient 8-second polling interval delivering new incoming booking requests without manual reload
+    // Rapid 5-second polling interval delivering new incoming booking requests without manual reload
     const pollInterval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
       loadBookings(true)
-    }, 8000)
+    }, 5000)
 
     return () => {
       window.removeEventListener('hourly-provider-buzzer-change', handleBuzzerChange)

@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/Input'
 import { showToast } from '@/components/ui/Toast'
 import { useAuth } from '@/hooks/useAuth'
 import { compressImageFile } from '@/lib/utils'
+import { DEFAULT_AVATARS } from '@/lib/constants'
 
 export default function ProviderProfilePage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -35,7 +36,7 @@ export default function ProviderProfilePage() {
   const [phone, setPhone] = useState('')
   const [city, setCity] = useState('')
   const [email, setEmail] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATARS.provider)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [totalListings, setTotalListings] = useState(0)
@@ -66,6 +67,7 @@ export default function ProviderProfilePage() {
 
           if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
           else if (profile?.avatar_url) setAvatarUrl(profile.avatar_url)
+          else setAvatarUrl(DEFAULT_AVATARS.provider)
 
           if (typeof data.isOnline === 'boolean') {
             setIsOnline(data.isOnline)

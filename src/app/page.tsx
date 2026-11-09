@@ -45,6 +45,7 @@ export default function HomePage({
     local_guide: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-500' },
     sightseeing_tour: { bg: 'bg-rose-500/10', border: 'border-rose-500/30', text: 'text-rose-500' },
     experience: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-500' },
+    humani: { bg: 'bg-violet-500/10', border: 'border-violet-500/30', text: 'text-violet-600' },
   }
 
   return (
@@ -127,11 +128,11 @@ export default function HomePage({
               </h2>
             </div>
             <p className="text-sm text-slate-500 max-w-md mt-2 md:mt-0 font-medium">
-              Verified local motorcycle riders, private car chauffeurs, and family van drivers. Transparent hourly rates with zero surprise charges.
+              Verified local motorcycle riders, private car chauffeurs, family van drivers, and personal companion Human-Ⅰ assistants. Transparent hourly rates with zero surprise charges.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {SERVICE_CATEGORIES.map((cat) => {
               const styling = categoryColorMap[cat.value] || {
                 bg: 'bg-emerald-500/10',

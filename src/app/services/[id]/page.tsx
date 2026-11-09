@@ -1081,6 +1081,113 @@ const demoListingsData: Record<string, any> = {
       },
     ],
   },
+  'humani-cbe-01': {
+    id: 'humani-cbe-01',
+    title: 'Verified Personal City Companion & Shopping Human-Ⅰ — Coimbatore Hub',
+    category: 'humani',
+    short_description:
+      'Book a friendly, verified local person for all your hourly personal needs. Market shopping & bargaining, dialect translation, elderly hospital escort, or friendly city walks.',
+    description:
+      'Need an extra pair of hands, an experienced local negotiator, or a trusted companion in Coimbatore? Book Human-Ⅰ on-demand by the hour!\n\nWhether you are shopping for authentic Kanchipuram & Coimbatore soft silks at Cross-Cut Road and Town Hall and want someone who knows true local prices, or you need a patient companion to accompany your elderly parents to a Ganga Hospital appointment, or simply want a friendly local buddy to explore cafes and take aesthetic travel photos, your verified Human-Ⅰ is here for you.\n\nAll Human-Ⅰ companions are 100% Aadhaar verified, police background checked, and follow strict platform safety guidelines. You pay only for the exact hours booked, with 100% platform escrow protection until you meet in person and verify your 4-digit Ride/Meet Start OTP.',
+    destination_city: 'Coimbatore',
+    destination_state: 'Tamil Nadu',
+    address: 'RS Puram / Cross-Cut Road / Gandhipuram / Peelamedu, Coimbatore',
+    latitude: 11.0168,
+    longitude: 76.9558,
+    hourly_rate: 299,
+    min_booking_hours: 1,
+    max_booking_hours: 12,
+    buffer_time_minutes: 20,
+    average_rating: 4.95,
+    total_reviews: 42,
+    is_featured: true,
+    pickup_location: 'Doorstep Pickup / Hotel Lobby / Coimbatore Junction / Airport',
+    meeting_point: 'Your specified location or RS Puram Head Office',
+    max_participants: 2,
+    planned_spots: [
+      {
+        id: 'spot-1',
+        name: 'Town Hall & Cross-Cut Road Silk Bazaars',
+        duration: '2 Hours',
+        category: 'Shopping & Local Bargaining',
+        description: 'Navigate authentic wholesale silk and textile weavers with your Human-Ⅰ who knows genuine fair prices and quality weaves.',
+        insider_tip: 'Save up to 30% by skipping tourist-trap retail showrooms.',
+      },
+      {
+        id: 'spot-2',
+        name: 'Heritage Food Trail & Filter Coffee Walk',
+        duration: '1 Hour',
+        category: 'Foodie Companion',
+        description: 'Enjoy iconic Annapoorna ghee roast dosas, crisp vadas, and authentic piping-hot filter coffee with friendly conversation.',
+        insider_tip: 'Try the secret seasonal ghee sweets packaged fresh daily.',
+      },
+      {
+        id: 'spot-3',
+        name: 'Errands, Hospital Escort or Leisure Stroll',
+        duration: '1.5 Hours',
+        category: 'Personal Assistance',
+        description: 'Carrying bags, document queue standing, local pharmacy pickup, or peaceful company in Race Course and VOC park.',
+        insider_tip: 'Inform your Human-Ⅰ in advance if wheelchairs or special pacing is needed.',
+      },
+    ],
+    images: [
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
+    ],
+    included_services: [
+      'Dedicated 1-on-1 verified local person for all your personal hourly needs',
+      'Local market bargaining, bag carrying, and bazaar navigation',
+      'Dialect interpretation & bilingual translation (Tamil, English, Malayalam)',
+      'Patient accompaniment for elderly appointments or hospital visits',
+      'Solo traveler safety escort, navigation, and mobile photography buddy',
+      '100% Escrow Protection until Start OTP verification in person',
+    ],
+    excluded_services: [
+      'Personal merchandise purchases, bills, or medical expenses',
+      'Cab/Auto transport fare (booked separately or paid directly to driver)',
+    ],
+    terms_and_conditions:
+      'This is a personal hourly companion and assistance service ("Book Human-Ⅰ"). Human-Ⅰ companions provide companionship, shopping guidance, local errand assistance, and translation. Strictly adheres to platform code of conduct and safety regulations.',
+    cancellation_policy:
+      'Free 100% refund up to 2 hours before start time. 50% refund within 2 hours. Zero cancellation fees if host fails to arrive.',
+    humani_details: {
+      companion_name: 'Priya & Associates (Verified Human-Ⅰ)',
+      languages: ['Tamil', 'English', 'Malayalam', 'Hindi'],
+      skills: [
+        'Local Market Bargaining & Silk Identification',
+        'Hospital & Elderly Care Companion',
+        'Dialect Translation & Bureaucracy Navigation',
+        'Mobile Photography & Social Media Framing',
+        'City Navigation & Bag Assistance',
+      ],
+      id_verified: true,
+      police_verified: true,
+    },
+    packages: [
+      { id: 'pkg-hum-1', name: '1-Hour Quick Assist / Errand', duration_hours: 1, price: 299, description: 'Fast local task, document queue, translation, or shopping meetup' },
+      { id: 'pkg-hum-2', name: '3-Hour Half-Day Buddy', duration_hours: 3, price: 799, description: 'Textile shopping, hospital escort, or Annapoorna food walk (Save 11%)' },
+      { id: 'pkg-hum-3', name: '6-Hour Full Day Companion', duration_hours: 6, price: 1499, description: 'Comprehensive city assistance, bazaars, and scenic strolls (Save 16%)' },
+      { id: 'pkg-hum-4', name: '10-Hour All-Day VIP Human-Ⅰ', duration_hours: 10, price: 2299, description: 'Full-day dedicated assistant for events, tours, or errands (Save 23%)' },
+    ],
+    provider: {
+      business_name: 'Kovai Verified Human-Ⅰ Associates',
+      description: 'Professional, verified local individuals offering friendly, respectful companionship and personal assistance by the hour.',
+      city: 'Coimbatore',
+      languages: ['Tamil', 'English', 'Malayalam', 'Hindi'],
+      verification_status: 'approved',
+    },
+    reviews: [
+      {
+        id: 'rev-hum-1',
+        rating: 5,
+        review_text:
+          'I booked a Human-Ⅰ for 3 hours to help me bargain for wedding silk sarees in Town Hall. Not only did she save me over ₹4,000 on my purchases, she also took me to the best filter coffee shop in town! Booking by the hour was so effortless.',
+        created_at: '2024-03-25T14:20:00Z',
+        customer: { full_name: 'Ananya Sharma', avatar_url: null },
+      },
+    ],
+  },
 }
 
 export default function ServiceDetailPage() {
@@ -1454,6 +1561,55 @@ export default function ServiceDetailPage() {
                       <span className="font-bold text-gray-800">
                         Up to {listing.guide_details.max_group_size || 8} People
                       </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Humani Companion specific attributes */}
+              {(listing.category === 'humani' || listing.humani_details) && (
+                <div className="mt-6 pt-6 border-t border-gray-100 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                      <span>🤝</span>
+                      <span>Verified Human-Ⅰ Companion Capabilities</span>
+                    </h4>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-100 text-purple-800 w-fit">
+                      100% Aadhaar & Police Verified
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 flex items-start space-x-2.5">
+                      <span className="text-lg">🛍️</span>
+                      <div>
+                        <p className="font-bold text-gray-900 text-xs">Shopping & Market Bargaining</p>
+                        <p className="text-[11px] text-gray-600 mt-0.5">Assistance with local wholesale prices, silk identification, carrying bags, and bazaar navigation.</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 flex items-start space-x-2.5">
+                      <span className="text-lg">👵</span>
+                      <div>
+                        <p className="font-bold text-gray-900 text-xs">Elderly & Healthcare Escort</p>
+                        <p className="text-[11px] text-gray-600 mt-0.5">Patient, attentive company for clinic visits, temple darshans, and gentle morning strolls.</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 flex items-start space-x-2.5">
+                      <span className="text-lg">🗣️</span>
+                      <div>
+                        <p className="font-bold text-gray-900 text-xs">Dialect Translation & Bureaucracy</p>
+                        <p className="text-[11px] text-gray-600 mt-0.5">Fluent in regional languages to help you communicate seamlessly with locals, drivers, and officials.</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 flex items-start space-x-2.5">
+                      <span className="text-lg">📸</span>
+                      <div>
+                        <p className="font-bold text-gray-900 text-xs">Solo Travel Safety & Photography</p>
+                        <p className="text-[11px] text-gray-600 mt-0.5">A trusted local companion for cafes, sightseeing spots, and high-quality photo assistance.</p>
+                      </div>
                     </div>
                   </div>
                 </div>

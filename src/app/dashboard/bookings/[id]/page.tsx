@@ -36,6 +36,7 @@ import { FullPageLoader } from '@/components/ui/LoadingSpinner'
 import { showToast } from '@/components/ui/Toast'
 import { formatCurrency, formatDate, normalizeListingImages } from '@/lib/utils'
 import { printBookingInvoice } from '@/lib/invoiceUtils'
+import { getBookingStartOtp } from '@/lib/otpUtils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRealtimeBooking } from '@/hooks/useRealtimeBooking'
 import { LiveTripTrackingModal } from '@/components/booking/LiveTripTrackingModal'
@@ -227,6 +228,36 @@ export default function CustomerBookingDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Start Ride OTP Banner (Share with Host on Arrival) ── */}
+              {['confirmed', 'provider_accepted', 'driver_on_the_way', 'in_progress'].includes(booking.status) && (
+                <div className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border-2 border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-[#0a4d29] text-white flex items-center justify-center font-bold text-xl shadow-sm shrink-0">
+                      🔑
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-black text-sm uppercase tracking-wider text-emerald-950">
+                          Ride Start Verification OTP
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-200 text-emerald-900">
+                          Share at Pickup
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800 mt-0.5">
+                        Share this 4-digit security code with your driver/host in person when they arrive to begin your metered tour.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-white px-5 py-2.5 rounded-2xl border-2 border-emerald-600 shadow-sm shrink-0">
+                    <span className="text-xs font-black text-gray-500 uppercase tracking-widest">OTP:</span>
+                    <span className="font-mono text-3xl font-black text-[#0a4d29] tracking-widest">
+                      {getBookingStartOtp(booking.booking_number || booking.id)}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Schedule Highlights Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100 bg-gray-50/50 p-4 rounded-2xl">

@@ -169,7 +169,24 @@ export function Footer() {
                   Vans by the Hour
                 </Link>
               </li>
-              <li className="pt-2 border-t border-gray-800">
+              <li>
+                <Link
+                  href="/explore?category=humani"
+                  className="text-amber-300 hover:text-white transition-colors font-medium flex items-center gap-1.5"
+                >
+                  <span>🤝</span>
+                  <span>Book Human-Ⅰ</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-[#ff7a00] text-white">NEW</span>
+                </Link>
+              </li>
+              <li className="pt-2 border-t border-gray-800 space-y-2">
+                <Link
+                  href="/guides/book-your-humani"
+                  className="text-purple-300 hover:text-purple-200 font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <span>📖</span>
+                  <span>How "Human-Ⅰ" Works (Guide)</span>
+                </Link>
                 <Link
                   href="/regional-guides"
                   className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors flex items-center gap-1.5"

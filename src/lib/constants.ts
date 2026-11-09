@@ -46,6 +46,12 @@ export const SERVICE_CATEGORIES: ServiceCategoryOption[] = [
     icon: '🎭',
     description: 'Unique local experiences—culinary walks, heritage circuits, and nature trails.',
   },
+  {
+    label: 'Book Human-Ⅰ',
+    value: 'humani',
+    icon: '🤝',
+    description: 'Book a verified local companion for your personal needs—shopping partner, errands, translation, elderly assistance, or city buddy.',
+  },
 ]
 
 // ============================================================================
@@ -99,6 +105,26 @@ export const MAX_BOOKING_HOURS = 12
 
 export const CURRENCY = 'INR'
 export const CURRENCY_SYMBOL = '₹'
+
+// Guy Tourist and Guy Provider Profile Avatars
+export const DEFAULT_AVATARS = {
+  customer: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80', // Friendly male tourist with backpack
+  tourist: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+  provider: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80', // Professional male local host/provider guy
+  host: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
+  driver: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
+  admin: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80',
+}
+
+export function getDefaultAvatar(role?: string | null): string {
+  if (role === 'provider' || role === 'driver' || role === 'host') {
+    return DEFAULT_AVATARS.provider
+  }
+  if (role === 'admin') {
+    return DEFAULT_AVATARS.admin
+  }
+  return DEFAULT_AVATARS.tourist
+}
 
 // ============================================================================
 // Misc
@@ -335,5 +361,52 @@ export const initialFeaturedServices: any[] = [
       'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80',
     ],
     provider: { business_name: 'Anamalai Heritage Expeditions' },
+  },
+  {
+    id: 'humani-cbe-01',
+    title: 'Verified Personal City Companion & Shopping Human-Ⅰ — Coimbatore Hub',
+    category: 'humani',
+    short_description:
+      'Book a friendly, verified local person for all your hourly personal needs. From market bargaining and local shopping bags to dialect translation, hospital accompaniment, or friendly cafe walks.',
+    destination_city: 'Coimbatore',
+    hourly_rate: 299,
+    min_booking_hours: 1,
+    max_booking_hours: 12,
+    average_rating: 4.95,
+    total_reviews: 42,
+    is_featured: true,
+    planned_spots: [
+      { id: 'spot-1', name: 'Cross-Cut & Town Hall Silk Bazaars', duration: '2 Hours', category: 'Shopping & Bargaining' },
+      { id: 'spot-2', name: 'Local Cafe & Annapoorna Tiffin Trail', duration: '1 Hour', category: 'Food & Conversation' },
+      { id: 'spot-3', name: 'RS Puram Errand & City Walk Hub', duration: '1.5 Hours', category: 'Personal Assistance' },
+    ],
+    images: [
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+    ],
+    provider: { business_name: 'Kovai Verified Human-Ⅰ Associates' },
+  },
+  {
+    id: 'humani-pol-01',
+    title: 'Local Dialect Translator & Countryside Errand Human-Ⅰ — Pollachi',
+    category: 'humani',
+    short_description:
+      'Book your local Human-Ⅰ assistant in Pollachi. Fluent in Tamil, Malayalam, and English for market negotiations, countryside errand runs, agricultural tours, or personal photography companion.',
+    destination_city: 'Pollachi',
+    hourly_rate: 279,
+    min_booking_hours: 1,
+    max_booking_hours: 10,
+    average_rating: 4.9,
+    total_reviews: 29,
+    is_featured: true,
+    planned_spots: [
+      { id: 'spot-1', name: 'Pollachi Jaggery & Coconut Market', duration: '1.5 Hours', category: 'Local Negotiation' },
+      { id: 'spot-2', name: 'Canal Road Village Photography Walk', duration: '1.5 Hours', category: 'Companion Walk' },
+      { id: 'spot-3', name: 'Local Bank & Administrative Assist', duration: '1 Hour', category: 'Errand Support' },
+    ],
+    images: [
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
+    ],
+    provider: { business_name: 'Anamalai Local Human-Ⅰ Companions' },
   },
 ]

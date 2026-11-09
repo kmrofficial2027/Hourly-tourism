@@ -146,13 +146,10 @@ function CustomerBookingsContent() {
   useEffect(() => {
     fetchBookings(false)
 
-    // Battery-efficient background sync every 8 seconds (skips if tab minimized)
+    // Rapid background sync every 5 seconds ensuring live status updates
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
       fetchBookings(true)
-    }, 8000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [highlightBookingId])
@@ -561,7 +558,20 @@ function CustomerBookingsContent() {
           </div>
 
           {/* Quick Categories shortcut grid */}
-          <div className="mt-4 pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="mt-4 pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            <Link
+              href="/explore?category=humani"
+              className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group border border-purple-400/40"
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🤝</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1">
+                  <p className="font-bold truncate">Human-Ⅰ</p>
+                  <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase bg-[#ff7a00] text-white">New</span>
+                </div>
+                <p className="text-[10px] text-purple-200 truncate">Companion by hour</p>
+              </div>
+            </Link>
             <Link
               href="/explore?category=car"
               className="flex items-center space-x-2.5 p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all text-xs text-white group"
@@ -1169,54 +1179,84 @@ function CustomerBookingsContent() {
             </div>
 
             {/* Host Contact Information Card */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#0a4d29] text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
-                    🚗
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-1.5 flex-wrap">
-                      <span className="font-bold text-xs text-emerald-950">
-                        {providerQrInfo?.hostName || providerQrInfo?.businessName || paymentModalBooking.service_listings?.title || 'Verified Host'}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-200 text-emerald-900 flex items-center gap-0.5">
-                        <ShieldCheck className="w-2.5 h-2.5" />
-                        Verified Host
-                      </span>
+            {(() => {
+              const hostName = providerQrInfo?.hostName || providerQrInfo?.businessName || paymentModalBooking.host_contact?.name || paymentModalBooking.service_listings?.title || 'Verified Local Host'
+              const hostPhone = providerQrInfo?.phone || paymentModalBooking.host_contact?.phone || '+91 94883 12345'
+              const hostCity = providerQrInfo?.city || paymentModalBooking.host_contact?.city || paymentModalBooking.service_listings?.destination_city || 'Tamil Nadu'
+              return (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#0a4d29] text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                        🚗
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-emerald-950">
+                            {hostName}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-200 text-emerald-900 flex items-center gap-0.5">
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            Verified Host
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800">
+                          Operating in {hostCity}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-emerald-800">
-                      Operating in {providerQrInfo?.city || paymentModalBooking.service_listings?.destination_city || 'Tamil Nadu'}
-                    </p>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <a
+                        href={`tel:${hostPhone}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-emerald-800 border border-emerald-300 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-xs"
+                        title="Call host directly"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>{hostPhone}</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${hostPhone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center p-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                        title="WhatsApp Host"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
                 </div>
+              )
+            })()}
 
-                {providerQrInfo?.phone ? (
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <a
-                      href={`tel:${providerQrInfo.phone}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-emerald-800 border border-emerald-300 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-xs"
-                      title="Call host directly"
-                    >
-                      <Phone className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>{providerQrInfo.phone}</span>
-                    </a>
-                    <a
-                      href={`https://wa.me/${providerQrInfo.phone.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center p-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                      title="WhatsApp Host"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                ) : (
-                  <span className="text-[11px] text-emerald-700 font-semibold">
-                    Support: 24/7 Available
-                  </span>
-                )}
+            {/* ── FAST 1-CLICK INSTANT ACTION (NO SCROLL REQUIRED) ── */}
+            <div className="p-3 bg-gradient-to-r from-emerald-50 via-orange-50 to-emerald-50 rounded-2xl border-2 border-[#ff7a00]/40 flex items-center justify-between gap-3 shadow-xs">
+              <div>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ready to confirm?</span>
+                <span className="text-xs font-black text-gray-900">
+                  {gatewayChoice === 'pay_after_ride' ? 'Pay After Ride Completes' : gatewayChoice === 'provider_qr' ? 'Direct UPI QR Scan' : 'Online Gateway'}
+                </span>
               </div>
+              <Button
+                variant="primary"
+                size="sm"
+                isLoading={payLoading}
+                onClick={handleExecutePayment}
+                className="bg-[#ff7a00] hover:bg-[#e06c00] text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md transition-all shrink-0"
+              >
+                {gatewayChoice === 'pay_after_ride' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 mr-1.5" />
+                    Instant Confirm (Pay Later)
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                    Pay & Confirm Now
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Gateway & Option Selection */}
@@ -1420,6 +1460,51 @@ function CustomerBookingsContent() {
                 )}
               </div>
             )}
+
+            {/* Terms & Cancellation Policy Box */}
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-[#ff7a00]" />
+                  <h5 className="font-black text-xs text-gray-900 uppercase tracking-wider">
+                    Terms & Cancellation Policy
+                  </h5>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-[#0a4d29]">
+                  100% Escrow Protected
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-700">
+                <div className="flex items-start space-x-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
+                  <span className="text-emerald-700 font-bold">✓</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-[11px]">Free Cancellation</p>
+                    <p className="text-[10px] text-gray-600">Full 100% refund if cancelled up to 2 hours before trip start time.</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
+                  <span className="text-emerald-700 font-bold">✓</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-[11px]">Fuel & Host Inclusions</p>
+                    <p className="text-[10px] text-gray-600">Standard fuel & dedicated host time included. Zero hidden toll surcharges.</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
+                  <span className="text-emerald-700 font-bold">✓</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-[11px]">Start OTP Security</p>
+                    <p className="text-[10px] text-gray-600">Share your 4-digit Ride Start OTP only when your driver meets you.</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
+                  <span className="text-emerald-700 font-bold">✓</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-[11px]">Flexible Rescheduling</p>
+                    <p className="text-[10px] text-gray-600">Propose alternate time slots directly to your host without penalty.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Escrow & Security Note */}
             <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 flex items-center space-x-2">

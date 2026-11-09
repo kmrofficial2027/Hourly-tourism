@@ -208,7 +208,7 @@ export function CustomerGlobalAlerts() {
 
           if (hasLoadedInitialRef.current && oldStatus && oldStatus !== b.status) {
             // 1. Status transitioned to 'confirmed' -> Joyful chime
-            if (b.status === 'confirmed' && oldStatus !== 'confirmed') {
+            if (['confirmed', 'provider_accepted'].includes(b.status) && !['confirmed', 'provider_accepted'].includes(oldStatus)) {
               playBookingAcceptedSound()
               setActiveAlert({
                 type: 'accepted',
@@ -219,7 +219,7 @@ export function CustomerGlobalAlerts() {
             }
 
             // 2. Status transitioned to 'rejected' or 'cancelled' -> Descending tone
-            if (['rejected', 'cancelled'].includes(b.status) && oldStatus === 'pending') {
+            if (['rejected', 'cancelled'].includes(b.status) && ['pending', 'awaiting_confirmation', 'pending_provider_approval'].includes(oldStatus)) {
               playBookingRejectedSound()
               setActiveAlert({
                 type: 'rejected',
@@ -270,7 +270,7 @@ export function CustomerGlobalAlerts() {
             if (updated.customer_id && updated.customer_id !== user.id) return
 
             // 1. Status became 'confirmed' -> Joyful 4-note ascending chime
-            if (updated.status === 'confirmed' && old?.status !== 'confirmed') {
+            if (['confirmed', 'provider_accepted'].includes(updated.status) && !['confirmed', 'provider_accepted'].includes(old?.status)) {
               playBookingAcceptedSound()
               setActiveAlert({
                 type: 'accepted',
@@ -281,7 +281,7 @@ export function CustomerGlobalAlerts() {
             }
 
             // 2. Status became 'rejected' or 'cancelled' -> Distinct 2-note descending alert
-            if (['rejected', 'cancelled'].includes(updated.status) && old?.status === 'pending') {
+            if (['rejected', 'cancelled'].includes(updated.status) && (!old?.status || ['pending', 'awaiting_confirmation', 'pending_provider_approval'].includes(old?.status))) {
               playBookingRejectedSound()
               setActiveAlert({
                 type: 'rejected',
@@ -298,13 +298,10 @@ export function CustomerGlobalAlerts() {
       console.debug('Customer global alerts realtime subscription skipped:', err)
     }
 
-    // Battery-efficient background polling (every 8 seconds when active, paused when minimized)
+    // High-responsiveness 5-second background polling ensuring instant alert delivery
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
       checkCustomerStatusUpdates()
-    }, 8000)
+    }, 5000)
 
     return () => {
       if (channel) {

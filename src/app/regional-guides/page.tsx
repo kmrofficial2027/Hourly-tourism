@@ -25,6 +25,7 @@ import {
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { SearchBar } from '@/components/layout/SearchBar'
+import { Button } from '@/components/ui/Button'
 import { CityDestination, CityRegionalGuide } from '@/lib/destinations'
 
 function RegionalGuidesContent() {
@@ -168,7 +169,42 @@ function RegionalGuidesContent() {
 
           {/* ── Curated Hourly Circuits & Day Escapes ────────────────────────── */}
           <section className="py-16 sm:py-20 bg-white border-b border-gray-100">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+              {/* Book your Humani Companion Guide Banner */}
+              <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border-2 border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-md shadow-purple-600/30 shrink-0">
+                    🤝
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-extrabold text-sm text-purple-950 font-display">
+                        Need a Personal Companion or Assistant in {currentCity.name}?
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-purple-200 text-purple-900">
+                        New Category
+                      </span>
+                    </div>
+                    <p className="text-xs text-purple-800 mt-0.5">
+                      Book Human-Ⅰ by the hour for local market bargaining, hospital visits, or dialect translation from ₹249/hr.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link href="/guides/book-your-humani">
+                    <Button variant="primary" size="sm" className="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs">
+                      Read Human-Ⅰ Guide
+                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    </Button>
+                  </Link>
+                  <Link href={`/explore?category=humani&destination=${currentCity.name}`}>
+                    <Button variant="outline" size="sm" className="text-purple-900 border-purple-300 font-bold text-xs bg-white/80">
+                      Find Human-Ⅰ
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
                 <div>
                   <span className="text-xs font-extrabold uppercase tracking-widest text-[#ff7a00] block mb-1">

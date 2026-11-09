@@ -1,13 +1,19 @@
-import React from 'react'
+'use client'
+
+import React, { useState } from 'react'
+import { getDefaultAvatar } from '@/lib/constants'
 
 export interface AvatarProps {
   src?: string | null
   name?: string | null
+  role?: string | null
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
 
-export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) {
+export function Avatar({ src, name, role, size = 'md', className = '' }: AvatarProps) {
+  const [imgError, setImgError] = useState(false)
+
   const sizeMap = {
     xs: 'w-6 h-6 text-xs',
     sm: 'w-8 h-8 text-xs',
@@ -25,12 +31,16 @@ export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) 
     return n.slice(0, 2).toUpperCase()
   }
 
-  if (src) {
+  // If no custom src, use Guy Tourist or Guy Provider avatar
+  const effectiveSrc = !imgError ? (src || getDefaultAvatar(role)) : null
+
+  if (effectiveSrc) {
     return (
       <img
-        src={src}
-        alt={name || 'Avatar'}
-        className={`rounded-full object-cover border border-gray-200 ${sizeMap[size]} ${className}`}
+        src={effectiveSrc}
+        alt={name || `${role || 'User'} Avatar`}
+        onError={() => setImgError(true)}
+        className={`rounded-full object-cover border border-gray-200 shadow-xs ${sizeMap[size]} ${className}`}
       />
     )
   }
